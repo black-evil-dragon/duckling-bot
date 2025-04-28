@@ -11,11 +11,16 @@ import logging
 log: 'logging.Logger' = None
 
 class Bot:
-    def __init__(self, token: str):
+    session_manager: 'Session' = None
+
+    def __init__(self, token: str, test_run: bool = False):
         self.token = token
         self.app = Application.builder().token(self.token).build()
 
-        self.session_manager: 'Session' = Session()
+
+        if not test_run:
+            #? В Github Actions мы не будем использовать сессии
+            self.session_manager: 'Session' = Session()
 
         self.app.bot_data.update({'session': self.session_manager})
 
@@ -34,12 +39,13 @@ def main():
     try:
         TOKEN = os.getenv('TOKEN')
         TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
+
         log.debug(f'TEST_RUN: {TEST_RUN}')
 
         if not TOKEN:
             from utils.config import TOKEN
 
-        bot = Bot(token=TOKEN)
+        bot = Bot(token=TOKEN, test_run=TEST_RUN)
     
         try:
             from core.modules import setup_modules
