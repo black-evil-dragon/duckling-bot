@@ -34,6 +34,7 @@ def main():
     try:
         TOKEN = os.getenv('TOKEN')
         TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
+        log.debug(f'TEST_RUN: {TEST_RUN}')
 
         if not TOKEN:
             from utils.config import TOKEN
@@ -44,8 +45,11 @@ def main():
             from core.modules import setup_modules
             bot.setup_modules(setup_modules)
 
-            if not TEST_RUN:
-                bot.run()
+            if TEST_RUN:
+                return log.info('Включен режим тестовый запуск')
+            
+            bot.run()
+
         except Exception as error:
             return log.error(f'Не удалось загрузить модули: {str(error)}')
         
