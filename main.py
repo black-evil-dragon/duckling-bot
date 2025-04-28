@@ -1,11 +1,11 @@
 from telegram.ext import Application
 
-import logging
 
 from core.session import Session
-
 from utils.logger import setup_logger
 
+import os
+import logging
 
 
 log: 'logging.Logger' = None
@@ -32,7 +32,10 @@ class Bot:
 
 def main():
     try:
-        from utils.config import TOKEN
+        TOKEN = os.getenv('TOKEN')
+
+        if not TOKEN:
+            from utils.config import TOKEN
 
         bot = Bot(token=TOKEN)
     
