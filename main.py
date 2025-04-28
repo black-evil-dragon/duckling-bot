@@ -41,6 +41,7 @@ def main():
         TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
 
         log.debug(f'TEST_RUN: {TEST_RUN}')
+        log.debug(f'TOKEN FROM {"[env]" if TOKEN else "[config.py]"}')
 
         if not TOKEN:
             from utils.config import TOKEN
