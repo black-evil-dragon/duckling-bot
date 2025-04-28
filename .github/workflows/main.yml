@@ -19,25 +19,28 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-    # - name: Run tests
-    #   run: |
-    #     python -m pytest
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Установка Python 3.10
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-      - name: Установка зависимостей
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run bot
+      - name: Run tests
         env:
           TOKEN: ${{ secrets.TOKEN }}
+          TEST_MODE: "true"
         run: |
           python main.py
+
+  # deploy:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Установка Python 3.10
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.10"
+  #     - name: Установка зависимостей
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -r requirements.txt
+  #     - name: Run bot
+  #       env:
+  #         TOKEN: ${{ secrets.TOKEN }}
+  #       run: |
+  #         python main.py

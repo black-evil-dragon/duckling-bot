@@ -33,6 +33,7 @@ class Bot:
 def main():
     try:
         TOKEN = os.getenv('TOKEN')
+        TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
 
         if not TOKEN:
             from utils.config import TOKEN
@@ -43,7 +44,8 @@ def main():
             from core.modules import setup_modules
             bot.setup_modules(setup_modules)
 
-            bot.run()
+            if not TEST_RUN:
+                bot.run()
         except Exception as error:
             return log.error(f'Не удалось загрузить модули: {str(error)}')
         
