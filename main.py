@@ -1,6 +1,7 @@
 from telegram.ext import Application
 
 
+from core.db import Database
 from core.session import Session
 from utils.logger import setup_logger
 
@@ -8,27 +9,53 @@ import os
 import logging
 
 
+from dotenv import load_dotenv
+load_dotenv() 
+
+
 log: 'logging.Logger' = None
 
 class Bot:
     session_manager: 'Session' = None
+    db_manager = None
 
-    def __init__(self, token: str, test_run: bool = False):
+    def __init__(self, token: str, test_run: bool = False, db_filename: str = ''):
         self.token = token
         self.app = Application.builder().token(self.token).build()
 
-
+        #* Session
         if not test_run:
             #? В Github Actions мы не будем использовать сессии
             self.session_manager: 'Session' = Session()
 
         self.app.bot_data.update({'session': self.session_manager})
 
+
+
+        #* Database
+        if db_filename:
+            self.setup_database(db_filename)
+            
+
         
     def setup_modules(self, modules_config):
         modules_config(self.app)
         log.info("Модули установлены")
         
+
+    def setup_database(self, filename):
+        try:
+            if not os.path.exists(filename): raise FileNotFoundError(f"Файл {filename} не найден")
+            
+            self.db_manager = Database(filename=filename)
+            self.app.bot_data.update({'db': self.db_manager})
+
+            log.info(f'База данных успешно подключена к файлу: {filename}')
+
+        except Exception as e:
+            log.error(f'Не удалось загрузить базу данных: {e}')
+
+
 
     def run(self):
         log.info("Бот запускается...")
@@ -37,17 +64,26 @@ class Bot:
 
 def main():
     try:
-        TOKEN = os.getenv('TOKEN')
+        # * Окружение -----------------------------------------------------------
+        BOT_TOKEN = os.getenv('BOT_TOKEN')
         TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
+        DB_FILENAME = os.getenv('DB_FILENAME', '')
 
         log.debug(f'TEST_RUN: {TEST_RUN}')
-        log.debug(f'TOKEN FROM {"[env]" if TOKEN else "[config.py]"}')
+        log.debug(f'BOT_TOKEN FROM {"[env]" if BOT_TOKEN else "[config.py]"}')
 
-        if not TOKEN:
-            from utils.config import TOKEN
+        if not BOT_TOKEN:
+            from utils.config import BOT_TOKEN
 
-        bot = Bot(token=TOKEN, test_run=TEST_RUN)
-    
+        # * Инициализация ---------------------------------------------------------
+        bot = Bot(
+            token=BOT_TOKEN,
+            test_run=TEST_RUN,
+            db_filename=DB_FILENAME
+        )
+
+
+        # * Подключаем модули и запускаем ----------------------------------------
         try:
             from core.modules import setup_modules
             bot.setup_modules(setup_modules)

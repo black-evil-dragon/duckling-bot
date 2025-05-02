@@ -10,6 +10,9 @@ from core.session import Session
 from core.modules.group.formatters import create_schedule_keyboard
 from .formatters import format_schedule_week
 
+from . import messages
+from core.modules.group import messages as group_messages
+
 
 from core.data.group import GROUP_IDS
 
@@ -29,7 +32,7 @@ class ScheduleModule(BaseModule):
     
 
     def __init__(self):
-        log.info("GroupModule initialized")
+        log.info("ScheduleModule initialized")
 
 
     def setup(self, application: Application):
@@ -55,9 +58,11 @@ class ScheduleModule(BaseModule):
 
         # Если группа не выбрана, показываем клавиатуру с группами
         if 'group_id' not in context.user_data:
-            buttons = [[KeyboardButton(group)] for group in GROUP_IDS.keys()]
+            buttons = [[KeyboardButton(institute)] for institute in GROUP_IDS.keys()]
             reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
-            await update.message.reply_text("Выберите вашу группу:", reply_markup=reply_markup)
+
+            await update.message.reply_text(group_messages.choose_institute, reply_markup=reply_markup)
+
             return
 
         # Автоматический расчет дат (сегодня + 3 недели)
@@ -116,7 +121,7 @@ class ScheduleModule(BaseModule):
         # Получаем сохраненные данные
         data = context.user_data.get('schedule_data')
         if not data:
-            await query.edit_message_text("Данные расписания устарели. Запросите расписание снова.")
+            await query.edit_message_text(messages.schedule_wihtout_data)
             return
         
         # Форматируем запрошенную неделю
