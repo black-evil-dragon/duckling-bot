@@ -2,7 +2,6 @@ from typing import List, Tuple
 from telegram import BotCommand
 from telegram.ext import Application, ApplicationBuilder
 
-
 from core.db import Database
 from core.settings import COMMANDS, setup_commands
 
@@ -25,10 +24,9 @@ class Bot:
     db_manager = None
 
 
-
     def __init__(self, token: str, test_run: bool = False, db_filename: str = ''):
         self.token = token
-        # self.app = Application.builder().token(self.token).build()
+
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
         #* Session
