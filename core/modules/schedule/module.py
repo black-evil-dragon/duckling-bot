@@ -57,7 +57,7 @@ class ScheduleModule(BaseModule):
             return
 
         # Если группа не выбрана, показываем клавиатуру с группами
-        if 'group_id' not in context.user_data:
+        if 'selected_group' not in context.user_data:
             buttons = [[KeyboardButton(institute)] for institute in GROUP_IDS.keys()]
             reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
@@ -74,7 +74,7 @@ class ScheduleModule(BaseModule):
             response = session.post(
                 "https://tt2.vogu35.ru/",
                 data=json.dumps({
-                    "group_id": context.user_data['group_id'],
+                    "group_id": context.user_data['selected_group'],
                     "date_start": date_start,
                     "date_end": date_end,
                     "selected_lesson_type": "typical",

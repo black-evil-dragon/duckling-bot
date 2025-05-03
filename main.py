@@ -1,7 +1,11 @@
-from telegram.ext import Application
+from typing import List, Tuple
+from telegram import BotCommand
+from telegram.ext import Application, ApplicationBuilder
 
 
 from core.db import Database
+from core.settings import COMMANDS, setup_commands
+
 from core.session import Session
 from utils.logger import setup_logger
 
@@ -16,12 +20,16 @@ load_dotenv()
 log: 'logging.Logger' = None
 
 class Bot:
+
     session_manager: 'Session' = None
     db_manager = None
 
+
+
     def __init__(self, token: str, test_run: bool = False, db_filename: str = ''):
         self.token = token
-        self.app = Application.builder().token(self.token).build()
+        # self.app = Application.builder().token(self.token).build()
+        self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
         #* Session
         if not test_run:
@@ -31,17 +39,21 @@ class Bot:
         self.app.bot_data.update({'session': self.session_manager})
 
 
-
         #* Database
         if db_filename:
             self.setup_database(db_filename)
+
+
+    async def post_init(self, application):
+        await setup_commands(application, COMMANDS)
             
 
-        
+    # * ____________________________________________________________
+    # * |                       Setups                              |
     def setup_modules(self, modules_config):
         modules_config(self.app)
         log.info("Модули установлены")
-        
+
 
     def setup_database(self, filename):
         try:
@@ -55,8 +67,13 @@ class Bot:
         except Exception as e:
             log.error(f'Не удалось загрузить базу данных: {e}')
 
+    # * |___________________________________________________________|
 
 
+
+
+    # * ____________________________________________________________
+    # * |                        Run                                |
     def run(self):
         log.info("Бот запускается...")
         self.app.run_polling()

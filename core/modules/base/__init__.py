@@ -1,6 +1,8 @@
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
+from core.settings import COMMANDS
+
 
 
 #* Telegram bot framework ________________________________________________________________________
@@ -12,13 +14,10 @@ from telegram.ext import Application, ContextTypes
 
 class BaseMessages:
     # * TEXT ___________________________________________________________________
-    help_text = (
-        "/start - Запуск бота\n"
-        "/help - Помощь\n"
-        "/schedule - Расписание группы\n"
-        "/set_group - Установить группу\n"
-        "/settings - Настройки бота\n"
-    )
+
+    help_text = '\n'.join((
+        f'/{command} - {description}' for command, description in COMMANDS
+    ))
 
     # * TEMPLATES ___________________________________________________________________
 

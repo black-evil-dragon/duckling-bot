@@ -15,6 +15,8 @@ from core.data.group import GROUP_IDS
 #* Other packages ________________________________________________________________________
 import logging
 
+from core.modules.group import messages
+
 
 
 log = logging.getLogger("duckling")
@@ -30,7 +32,7 @@ class GroupModule(BaseModule):
 
     def setup(self, application: 'Application'):
         # Command
-        application.add_handler(CommandHandler("set_group", self.ask_course))
+        application.add_handler(CommandHandler("set_group", self.ask_institute))
 
         # Message
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_selection))
@@ -38,15 +40,55 @@ class GroupModule(BaseModule):
 
 
     # * ____________________________________________________________
+    # * |                   User utils                             |
+    def clear_choices(self, context: 'ContextTypes.DEFAULT_TYPE'):
+        for key in ['selected_institute', 'selected_course', 'selected_group']:
+            context.user_data.pop(key, None)
+
+
+    # * |___________________________________________________________|
+
+
+
+    # * ____________________________________________________________
     # * |               Command handlers                            |
 
     #? /set_group - Изменяет группу пользователя
-    async def ask_course(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        buttons = [[KeyboardButton(str(course))] for course in GROUP_IDS.keys()]
+    async def ask_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        self.clear_choices(context)
+
+        buttons = [[KeyboardButton(str(institute))] for institute in GROUP_IDS.keys()]
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
         
         await update.message.reply_text(
-            "Выберите ваш курс:",
+            messages.choose_institute,
+            reply_markup=reply_markup
+        )
+
+
+    async def ask_course(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        institute = context.user_data["selected_institute"]
+
+        courses = GROUP_IDS[institute]
+        buttons = [[KeyboardButton(str(course))] for course in courses]
+        reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
+
+        await update.message.reply_text(
+            messages.dialog_choose_course(institute),
+            reply_markup=reply_markup
+        )
+
+
+    async def ask_group(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        institute = context.user_data["selected_institute"]
+        course = context.user_data["selected_course"]
+
+        groups = GROUP_IDS[institute][course]
+        buttons = [[KeyboardButton(str(group))] for group in groups]
+        reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
+
+        await update.message.reply_text(
+            messages.choose_group,
             reply_markup=reply_markup
         )
 
@@ -60,40 +102,42 @@ class GroupModule(BaseModule):
     # * |               Message handlers                            |
 
     async def handle_selection(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        # Выбор института
-        if "selected_institute" not in context.user_data:
-            await self.selection_institute(update, context)
         
-        # Выбор курса
-        elif "selected_course" not in context.user_data:
-            await self.selection_course(update, context)
-        
-        # ЭВыбор группы
-        else:
-            await self.selection_group(update, context)
+        # Заходим в блок только если у нас нет группы в контексте пользователя
+        if "selected_group" not in context.user_data:
+
+            # Выбор института
+            if "selected_institute" not in context.user_data:
+                await self.selection_institute(update, context)
+            
+            # Выбор курса
+            elif "selected_course" not in context.user_data:
+                await self.selection_course(update, context)
+            
+            # Выбор группы
+            else:
+                await self.selection_group(update, context)
 
 
     #* ---------- Select institute 
     async def selection_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
     
-        if user_input in GROUP_IDS:
-            context.user_data["selected_institute"] = user_input
-            
-            # Получаем доступные курсы для выбранного института
-            courses = list(GROUP_IDS[user_input].keys())
-            buttons = [[KeyboardButton(str(course))] for course in courses]
-            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
+        if user_input not in GROUP_IDS.keys():
             
             await update.message.reply_text(
-                f"Выбран институт {user_input}. Теперь выберите курс:",
-                reply_markup=reply_markup
-            )
-        else:
-            await update.message.reply_text(
-                "Пожалуйста, выберите институт из предложенных вариантов.",
+                messages.institute_wrong_choice,
                 reply_markup=ReplyKeyboardRemove()
             )
+
+            await self.ask_institute(update, context)
+
+        else:
+            context.user_data["selected_institute"] = user_input
+
+            await self.ask_course(update, context)
+
+
 
 
     #* ---------- Select course 
@@ -103,24 +147,26 @@ class GroupModule(BaseModule):
         institute = context.user_data["selected_institute"]
         courses = GROUP_IDS[institute]
         
-        if user_input.isdigit() and int(user_input) in courses:
-            course = int(user_input)
-            context.user_data["selected_course"] = course
-            
-            # Получаем группы для выбранного курса
-            groups = courses[course]
-            buttons = [[KeyboardButton(group)] for group in groups.keys()]
-            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
-            
+        # Наверное тут лучше через метод проверять и убрать лишние if elif, но пока так
+        if not user_input.isdigit():
             await update.message.reply_text(
-                f"Выбран курс {course}. Теперь выберите группу:",
-                reply_markup=reply_markup
+                messages.course_wrong_choice
             )
+
+            await self.ask_course(update, context)
+        
+        elif int(user_input) not in courses:
+            await update.message.reply_text(
+                messages.course_wrong_choice
+            )
+
+            await self.ask_course(update, context)
+        
         else:
-            await update.message.reply_text(
-                "Пожалуйста, выберите курс из предложенных вариантов.",
-                reply_markup=ReplyKeyboardRemove()
-            )
+            context.user_data["selected_course"] = int(user_input)
+
+            await self.ask_group(update, context)
+            
 
 
     #* ---------- Select group 
@@ -131,23 +177,21 @@ class GroupModule(BaseModule):
         course = context.user_data["selected_course"]
         groups = GROUP_IDS[institute][course]
         
-        if user_input in groups:
-            group_id = groups[user_input]
-            context.user_data["group_id"] = group_id
-            
+        if user_input not in groups:
             await update.message.reply_text(
-                f"Институт: {institute}\nКурс: {course}\nГруппа: {user_input} (ID: {group_id})\n\nНастройки сохранены!",
+                messages.group_wrong_choice,
                 reply_markup=ReplyKeyboardRemove()
             )
-            # Очищаем временные данные
-            context.user_data.clear()
-            context.user_data["group_id"] = group_id  # Сохраняем только ID группы
+
+            await self.ask_group(update, context)
+
         else:
+            group_id = groups[user_input]
+            context.user_data["selected_group"] = group_id
+            
             await update.message.reply_text(
-                "Пожалуйста, выберите группу из предложенных вариантов.",
+                messages.result_choices(institute, course, user_input),
                 reply_markup=ReplyKeyboardRemove()
             )
             
-
-
     # * |___________________________________________________________|
