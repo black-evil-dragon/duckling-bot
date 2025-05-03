@@ -1,6 +1,8 @@
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
+from core.settings import COMMANDS
+
 
 
 #* Telegram bot framework ________________________________________________________________________
@@ -8,6 +10,20 @@ from telegram.ext import Application, ContextTypes
 #* Core ________________________________________________________________________
 
 #* Other packages ________________________________________________________________________
+
+
+class BaseMessages:
+    # * TEXT ___________________________________________________________________
+
+    help_text = '\n'.join((
+        f'/{command} - {description}' for command, description in COMMANDS
+    ))
+
+    # * TEMPLATES ___________________________________________________________________
+
+
+
+# * MODULE ___________________________________________________________________
 
 class BaseModule:
     def __init__(self) -> None:
