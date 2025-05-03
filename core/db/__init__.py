@@ -92,14 +92,32 @@ class Database:
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             is_bot BOOLEAN,
+
             first_name TEXT NOT NULL,
             last_name TEXT,
             username TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            group_id INTEGER,
+            subgroup_id INTEGER
         );
         """
         self.execute_query(query, commit=True)
-        log.info("Таблица users создана (или уже существовала)")
+        
+        # ! TEMP
+        # try:
+        #     self.execute_query("ALTER TABLE users ADD COLUMN group_id INTEGER;", commit=True)
+        # except Exception as e:
+        #     log.debug(f"Колонка group_id уже существует: {e}")
+        
+        # try:
+        #     self.execute_query("ALTER TABLE users ADD COLUMN subgroup_id INTEGER;", commit=True)
+        # except Exception as e:
+        #     log.debug(f"Колонка subgroup_id уже существует: {e}")
+        
+
+        log.info("Таблица users создана/обновлена")
     # * |____________________________________________________________|
 
 
@@ -109,12 +127,24 @@ class Database:
     # * |                   User management                          |
     def add_or_update_user(self, user_data: Dict[str, Any]) -> bool:
         query = """
-            INSERT INTO users (user_id, is_bot, first_name, last_name, username)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users (
+                user_id, is_bot, first_name, last_name, username,
+                group_id, subgroup_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 first_name = excluded.first_name,
                 last_name = excluded.last_name,
-                username = excluded.username;
+                username = excluded.username,
+                group_id = CASE 
+                    WHEN excluded.group_id IS NOT NULL AND excluded.group_id != '' 
+                    THEN excluded.group_id 
+                    ELSE users.group_id 
+                END,
+                subgroup_id = CASE 
+                    WHEN excluded.subgroup_id IS NOT NULL AND excluded.subgroup_id != '' 
+                    THEN excluded.subgroup_id 
+                    ELSE users.subgroup_id 
+                END
         """
 
         params = (
@@ -123,10 +153,18 @@ class Database:
             user_data.get("first_name", ""),
             user_data.get("last_name", ""),
             user_data.get("username"),
+            user_data.get("group_id"),
+            user_data.get("subgroup_id")
         )
-        cursor = self.execute_query(query, params, commit=True)
+        
+        
+        try:
+            cursor = self.execute_query(query, params, commit=True)
 
-        return cursor is not None
+            return cursor is not None
+        except Exception as e:
+            log.error(f"Ошибка обновления пользователя {user_data.get('id')}: {e}")
+            return False
     
 
     def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -136,7 +174,7 @@ class Database:
         if cursor:
             row = cursor.fetchone()
             if row:
-                columns = ["user_id", "is_bot", "first_name", "last_name", "username", "created_at"]
+                columns = ["user_id", "is_bot", "first_name", "last_name", "username", "created_at", "group_id", "subgroup_id",]
                 return dict(zip(columns, row))
         return None
     # * |____________________________________________________________|

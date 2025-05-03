@@ -5,6 +5,7 @@ from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, App
 
 #* Core ________________________________________________________________________
 from core.modules.base import BaseModule
+from core.modules.group.module import GroupModule
 from core.session import Session
 
 from core.modules.group.formatters import create_schedule_keyboard
@@ -53,15 +54,12 @@ class ScheduleModule(BaseModule):
         session: 'Session' = context.bot_data.get('session')
         
         if not session:
-            await update.message.reply_text("Ошибка: сессия не инициализирована")
+            await update.message.reply_text(messages.session_error)
             return
 
-        # Если группа не выбрана, показываем клавиатуру с группами
-        if 'selected_group' not in context.user_data:
-            buttons = [[KeyboardButton(institute)] for institute in GROUP_IDS.keys()]
-            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
-            await update.message.reply_text(group_messages.choose_institute, reply_markup=reply_markup)
+        if 'selected_group' not in context.user_data:
+            await GroupModule.ask_institute(update, context)
 
             return
 
@@ -74,7 +72,7 @@ class ScheduleModule(BaseModule):
             response = session.post(
                 "https://tt2.vogu35.ru/",
                 data=json.dumps({
-                    "group_id": context.user_data['selected_group'],
+                    "group_id": str(context.user_data['selected_group']),
                     "date_start": date_start,
                     "date_end": date_end,
                     "selected_lesson_type": "typical",
@@ -91,7 +89,6 @@ class ScheduleModule(BaseModule):
 
             total_weeks = len(data['schedule']) - 1
             reply_markup = create_schedule_keyboard(0, total_weeks)
-            
 
 
             await update.message.reply_text(
@@ -100,8 +97,8 @@ class ScheduleModule(BaseModule):
                 reply_markup=reply_markup
             )
             
-        except Exception as e:
-            await update.message.reply_text(f"Произошла ошибка: {str(e)}")
+        except Exception:
+            await update.message.reply_text(messages.server_error)
 
     # * |___________________________________________________________|
 
