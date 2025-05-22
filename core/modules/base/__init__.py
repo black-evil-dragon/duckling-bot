@@ -1,3 +1,5 @@
+from functools import wraps
+from typing import Callable
 from telegram import Update
 from telegram.ext import Application, ContextTypes
 
@@ -31,6 +33,29 @@ class BaseModule:
 
     def setup(self, application: 'Application') -> None:
         raise Exception('Функция не переопределена')
+    
+
+    @staticmethod
+    def set_command_process(is_run: bool, context: 'ContextTypes.DEFAULT_TYPE'):
+        context.user_data.update(dict(
+            is_command_process=is_run
+        ))
+        return context
+
+
+    @staticmethod
+    def command_process(is_run: bool):
+        def decorator(func: Callable) -> Callable:
+            @wraps(func)
+            async def wrapper(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', **kwargs):
+
+                context = BaseModule.set_command_process(is_run, context)
+                
+                return await func(update, context, **kwargs)
+            
+            return wrapper
+        return decorator
+    
     
 
     # * ____________________________________________________________

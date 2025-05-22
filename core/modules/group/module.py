@@ -1,6 +1,5 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from typing import Any, Dict
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, User
 from telegram import Update
 
@@ -10,7 +9,7 @@ from telegram.ext import filters
 
 #* Core ________________________________________________________________________
 from core.modules.base import BaseModule
-from core.data.group import GROUP_IDS, SUBGROUP_IDS
+from core.data.group import GROUP_IDS, SUBGROUP_IDS, Group
 from core.db import Database
 
 #* Other packages ________________________________________________________________________
@@ -26,6 +25,7 @@ log.setLevel(logging.DEBUG)
 
 #* Module ________________________________________________________________________
 class GroupModule(BaseModule):
+    group_ids = Group.load_from_json().get('groups')
 
     def __init__(self):
         log.info("GroupModule initialized")
@@ -79,15 +79,26 @@ class GroupModule(BaseModule):
 
     #? /set_group - Изменяет группу пользователя
     @staticmethod
+    @BaseModule.command_process(True)
     async def ask_institute(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         GroupModule.clear_choices(context)
+        update_message = update.message or update.callback_query.message
 
-        context.user_data["is_group_selection"] = True
+        context.user_data.update(dict(
+            is_group_selection=True,
+            is_command_process=True
+        ))
 
-        buttons = [[KeyboardButton(str(institute))] for institute in GROUP_IDS.keys()]
+        buttons = [
+            [
+                KeyboardButton(str(institute))
+                for institute in list(GroupModule.group_ids)[i:i+3]
+            ] for i in range(0, len(list(GroupModule.group_ids)), 3)
+        ]
+
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
         
-        await update.message.reply_text(
+        await update_message.reply_text(
             messages.choose_institute,
             reply_markup=reply_markup
         )
@@ -96,9 +107,15 @@ class GroupModule(BaseModule):
     @staticmethod
     async def ask_course(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         institute = context.user_data["selected_institute"]
+        courses = list(GroupModule.group_ids[institute])
 
-        courses = GROUP_IDS[institute]
-        buttons = [[KeyboardButton(str(course))] for course in courses]
+        buttons = [
+            [
+                KeyboardButton(str(value))
+                for value in courses[i:i+3]
+            ] for i in range(0, len(courses), 3)
+        ]
+
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
         await update.message.reply_text(
@@ -106,13 +123,22 @@ class GroupModule(BaseModule):
             reply_markup=reply_markup
         )
 
+
     @staticmethod
     async def ask_group(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         institute = context.user_data["selected_institute"]
         course = context.user_data["selected_course"]
 
-        groups = GROUP_IDS[institute][course]
-        buttons = [[KeyboardButton(str(group))] for group in groups]
+        groups = list(GroupModule.group_ids[institute][course])
+
+        buttons = [
+            [
+                KeyboardButton(str(value))
+                for value in groups[i:i+3]
+            ] for i in range(0, len(groups), 3)
+        ]
+
+
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
         await update.message.reply_text(
@@ -122,13 +148,22 @@ class GroupModule(BaseModule):
 
 
     @staticmethod
+    @BaseModule.command_process(True)
     async def ask_subgroup(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         context.user_data.pop('selected_subgroup', None)
 
-        context.user_data["is_subgroup_selection"] = True
+        context.user_data.update(dict(
+            is_subgroup_selection=True,
+            is_command_process=True
+        ))
 
+        buttons = [
+            [
+                KeyboardButton(str(value))
+                for value in SUBGROUP_IDS[i:i+3]
+            ] for i in range(0, len(SUBGROUP_IDS), 3)
+        ]
 
-        buttons = [[KeyboardButton(str(subgroup_id))] for subgroup_id in SUBGROUP_IDS]
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
         await update.message.reply_text(
@@ -146,7 +181,6 @@ class GroupModule(BaseModule):
     # * |               Message handlers                            |
 
     async def handle_selection(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-
         # Заходим в блок только если у нас нет группы в контексте пользователя
         if context.user_data.get('is_group_selection', False):
 
@@ -170,7 +204,7 @@ class GroupModule(BaseModule):
     async def selection_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
     
-        if user_input not in GROUP_IDS.keys():
+        if user_input not in self.group_ids.keys():
             
             await update.message.reply_text(
                 messages.institute_wrong_choice,
@@ -192,7 +226,7 @@ class GroupModule(BaseModule):
         user_input = update.message.text
 
         institute = context.user_data["selected_institute"]
-        courses = GROUP_IDS[institute]
+        courses = self.group_ids[institute]
         
         # Наверное тут лучше через метод проверять и убрать лишние if elif, но пока так
         if not user_input.isdigit():
@@ -202,7 +236,7 @@ class GroupModule(BaseModule):
 
             await self.ask_course(update, context)
         
-        elif int(user_input) not in courses:
+        elif user_input not in courses:
             await update.message.reply_text(
                 messages.course_wrong_choice
             )
@@ -210,32 +244,60 @@ class GroupModule(BaseModule):
             await self.ask_course(update, context)
         
         else:
-            context.user_data["selected_course"] = int(user_input)
+            context.user_data["selected_course"] = user_input
 
             await self.ask_group(update, context)
             
 
 
-    #* ---------- Select group 
+    #* ---------- Select group
     async def selection_group(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
 
         institute = context.user_data["selected_institute"]
         course = context.user_data["selected_course"]
-        groups = GROUP_IDS[institute][course]
+        groups = self.group_ids[institute][course]
+
+        groups_search = Group.find_group_by_name(groups=[group for group in groups], group_name=user_input)
+
         
-        if user_input not in groups:
+        if user_input not in groups and not len(groups_search):
             await update.message.reply_text(
                 messages.group_wrong_choice,
                 reply_markup=ReplyKeyboardRemove()
             )
 
             await self.ask_group(update, context)
+        elif len(groups_search) > 1:
+            buttons = [[KeyboardButton(group)] for group in groups_search]
+            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
+
+            await update.message.reply_text(
+                messages.choose_group,
+                reply_markup=reply_markup
+            )
+
+        elif len(groups_search) == 1:
+            group_id = groups[groups_search[0]]
+
+            context.user_data["selected_group"] = group_id
+            context.user_data['is_group_selection'] = False
+            context.user_data["is_command_process"] = False
+
+            user = update.effective_user
+            self.save_user_data(user, context)
+            
+            await update.message.reply_text(
+                messages.result_choices(institute, course, groups_search[0]),
+                reply_markup=ReplyKeyboardRemove()
+            )
 
         else:
             group_id = groups[user_input]
+
             context.user_data["selected_group"] = group_id
             context.user_data['is_group_selection'] = False
+            context.user_data["is_command_process"] = False
 
             user = update.effective_user
             self.save_user_data(user, context)
@@ -266,6 +328,7 @@ class GroupModule(BaseModule):
 
             self.save_user_data(user, context)
             
+            BaseModule.set_command_process(False, context)
 
             await update.message.reply_text(
                 messages.result_subgroup_choice(SUBGROUP_IDS[user_input]),

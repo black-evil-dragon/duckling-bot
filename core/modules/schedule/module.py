@@ -8,19 +8,15 @@ from core.modules.base import BaseModule
 from core.modules.group.module import GroupModule
 from core.session import Session
 
-from core.modules.group.formatters import create_schedule_keyboard
-from .formatters import format_schedule_week
+from .formatters import prepare_schedule_weeks_data, prepare_schedule_day_data
 
 from . import messages
-from core.modules.group import messages as group_messages
 
-
-from core.data.group import GROUP_IDS
 
 #* Other packages ________________________________________________________________________
 from datetime import datetime, timedelta
-import json
 import logging
+import traceback
 
 
 
@@ -39,28 +35,81 @@ class ScheduleModule(BaseModule):
     def setup(self, application: Application):
         # Command
         application.add_handler(CommandHandler("schedule", self.get_schedule))
+        application.add_handler(CommandHandler("today", self.get_schedule_day))
+
 
         # Callback
         application.add_handler(CallbackQueryHandler(self.schedule_callback, pattern="^week_"))
 
 
+
     
-
-
-
     # * ____________________________________________________________
     # * |               Command handlers                            |
-    async def get_schedule(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    @staticmethod
+    async def get_schedule_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', today = datetime.now().date()):
+        update_message = update.message or update.callback_query.message
         session: 'Session' = context.bot_data.get('session')
         
         if not session:
-            await update.message.reply_text(messages.session_error)
+            await update_message.reply_text(messages.session_error)
             return
 
 
         if 'selected_group' not in context.user_data:
             await GroupModule.ask_institute(update, context)
+            return
 
+        
+        
+        try:
+            # Получаем расписание группы для трех недель
+            response = session.post(
+                "schedule/day/",
+                json={
+                    "group_id": str(context.user_data['selected_group']),
+                    "date": today.strftime("%Y-%m-%d"),
+                    "selected_lesson_type": "typical",
+                }
+            )
+            response.raise_for_status()
+            response_data: dict = response.json()
+
+            schedule = dict(
+                **prepare_schedule_day_data(response_data.get("data", {})),
+                last_update=response_data.get("last_update", ""),
+            )
+            context.user_data['schedule_day_data'] = schedule
+
+            message = messages.format_schedule_day(schedule)
+            reply_markup = messages.create_pagination_keyboard(0, 1, 'день')
+
+
+            await update_message.reply_text(
+                message,
+                parse_mode='HTML',
+                reply_markup=reply_markup
+            )
+            
+        except Exception:
+            traceback.print_exc()
+            await update_message.reply_text(messages.server_error)
+        
+
+
+    @staticmethod
+    async def get_schedule(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        update_message = update.message or update.callback_query.message
+        session: 'Session' = context.bot_data.get('session')
+        
+        
+        if not session:
+            await update_message.reply_text(messages.session_error)
+            return
+
+
+        if 'selected_group' not in context.user_data:
+            await GroupModule.ask_institute(update, context)
             return
 
         # Автоматический расчет дат (сегодня + 3 недели)
@@ -69,41 +118,53 @@ class ScheduleModule(BaseModule):
         date_end = (today + timedelta(weeks=3)).strftime("%Y-%m-%d")
         
         try:
+            # Получаем расписание группы для трех недель
             response = session.post(
-                "https://tt2.vogu35.ru/",
-                data=json.dumps({
+                "schedule/",
+                json={
                     "group_id": str(context.user_data['selected_group']),
                     "date_start": date_start,
                     "date_end": date_end,
                     "selected_lesson_type": "typical",
-                })
+                }
             )
             response.raise_for_status()
-            data = response.json()
+            response_data: dict = response.json()
+
+            schedule = dict(
+                group=response_data.get("group", ""),
+                data=prepare_schedule_weeks_data(response_data.get("data", {})),
+                last_update=response_data.get("last_update", ""),
+            )
+            context.user_data['schedule_weeks_data'] = schedule
             
 
-            context.user_data['schedule_data'] = data
-            
+            message = messages.format_schedule_weeks(schedule, 0)
 
-            message = format_schedule_week(data, 0)
-
-            total_weeks = len(data['schedule']) - 1
-            reply_markup = create_schedule_keyboard(0, total_weeks)
+            total_weeks = len(schedule) - 1
+            # reply_markup = messages.create_pagination_keyboard(0, total_weeks, 'неделя')
 
 
-            await update.message.reply_text(
+            await update_message.reply_text(
                 message,
                 parse_mode='HTML',
-                reply_markup=reply_markup
+                # reply_markup=reply_markup
             )
             
         except Exception:
-            await update.message.reply_text(messages.server_error)
+            print(response_data.get('error'))
+            traceback.print_exc()
+            await update_message.reply_text(messages.server_error)
 
     # * |___________________________________________________________|
 
 
 
+    # * ____________________________________________________________
+    # * |               Message handlers                            |
+
+
+    # * |___________________________________________________________|
 
 
     # * ____________________________________________________________
@@ -116,17 +177,17 @@ class ScheduleModule(BaseModule):
         week_idx = int(query.data.split('_')[1])
         
         # Получаем сохраненные данные
-        data = context.user_data.get('schedule_data')
+        data = context.user_data.get('schedule_weeks_data')
         if not data:
             await query.edit_message_text(messages.schedule_wihtout_data)
             return
         
         # Форматируем запрошенную неделю
-        message = format_schedule_week(data, week_idx)
+        message = messages.format_schedule_weeks(data, week_idx)
         
         # Обновляем клавиатуру
-        total_weeks = len(data['schedule']) - 1
-        reply_markup = create_schedule_keyboard(week_idx, total_weeks)
+        total_weeks = len(data['data']) - 1
+        reply_markup = messages.create_pagination_keyboard(week_idx, total_weeks, 'неделя')
         
         await query.edit_message_text(
             text=message,
