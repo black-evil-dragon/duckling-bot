@@ -1,17 +1,20 @@
-from functools import wraps
-from typing import Callable
-from telegram import Update
-from telegram.ext import Application, ContextTypes
-
-from core.settings import COMMANDS
-
+# Вообще по хорошему тут все переделать, но так исторически сложилось
 
 
 #* Telegram bot framework ________________________________________________________________________
+from telegram import Update
+from telegram.ext import Application, ContextTypes
+
 
 #* Core ________________________________________________________________________
+from core.settings import COMMANDS
+
 
 #* Other packages ________________________________________________________________________
+from functools import wraps
+from typing import Callable
+
+
 
 
 class BaseMessages:
@@ -25,8 +28,8 @@ class BaseMessages:
 
 
 
-# * MODULE ___________________________________________________________________
 
+# * MODULE ___________________________________________________________________
 class BaseModule:
     def __init__(self) -> None:
         pass
@@ -34,14 +37,16 @@ class BaseModule:
     def setup(self, application: 'Application') -> None:
         raise Exception('Функция не переопределена')
     
-
+    
+    # * ____________________________________________________________
+    # * |               Decorators and utils                         |
     @staticmethod
     def set_command_process(is_run: bool, context: 'ContextTypes.DEFAULT_TYPE'):
         context.user_data.update(dict(
             is_command_process=is_run
         ))
         return context
-
+    
 
     @staticmethod
     def command_process(is_run: bool):
@@ -55,16 +60,15 @@ class BaseModule:
             
             return wrapper
         return decorator
+    # * |___________________________________________________________|
+
+
     
     
 
     # * ____________________________________________________________
     # * |               Command handlers                            |
-    # ...
 
-    #? /some_command - some command
-    def some_command(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE') -> None:
-        return 
     # * |___________________________________________________________|
 
 

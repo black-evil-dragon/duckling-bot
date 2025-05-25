@@ -1,3 +1,4 @@
+import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from core.data.weekdays import WEEKDAYS
@@ -7,14 +8,32 @@ from core.modules.schedule.formatters import get_date_by_weekday
 
 
 # * KEYBOARDS ___________________________________________________________________
-def create_pagination_keyboard(current_page=0, total_pages=0, entity='страница'):
+def create_pagination_keyboard(callback_data: str, current_page: int, total_pages: int, entity='страница') -> 'InlineKeyboardMarkup':
     keyboard = []
 
     if current_page > 0:
-        keyboard.append(InlineKeyboardButton(f"⬅️ Предыдущая {entity}", callback_data=f"week_{current_page-1}"))
-    
+        keyboard.append(InlineKeyboardButton(f"⬅️ Предыдущая {entity}", callback_data=f"{callback_data}_{current_page-1}"))
+
+
     if current_page < total_pages - 1:
-        keyboard.append(InlineKeyboardButton(f"Следующая {entity} ➡️", callback_data=f"week_{current_page+1}"))
+        keyboard.append(InlineKeyboardButton(f"Следующая {entity} ➡️", callback_data=f"{callback_data}_{current_page+1}"))
+    
+    return InlineKeyboardMarkup([keyboard])
+
+
+def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница') -> 'InlineKeyboardMarkup':
+    """
+    Более улучшеная функция
+    """
+    keyboard = []
+
+    if prev_key is not None:
+        keyboard.append(InlineKeyboardButton(f"⬅️ {entity}", callback_data=f"{callback_data}_{prev_key}"))
+    
+    keyboard.append(InlineKeyboardButton("📍 Меню", callback_data="delegate#menu"))
+
+    if next_key is not None:
+        keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}_{next_key}"))
     
     return InlineKeyboardMarkup([keyboard])
 
@@ -25,7 +44,7 @@ def create_pagination_keyboard(current_page=0, total_pages=0, entity='стран
 schedule_not_found = "Расписание пустое"
 week_not_found = "Неделя не найдена. Обратитесь к администратору"
 
-schedule_wihtout_data = "Данные расписания отсутствуют. Запросите расписание снова <code>/schedule</code>"
+schedule_wihtout_data = "Данные расписания отсутствуют. Запросите расписание снова /schedule"
 
 
 session_error = "Произошла ошибка при установке сессии\n\nПопробуйте снова позже"
@@ -39,10 +58,13 @@ def schedule_title(title):
 
 
 def week_info(week_type, first_date, last_date=None):
+    first_date = datetime.datetime.strptime(first_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+
     if last_date is not None:
-        return f"<b>| {week_type} | {first_date} - {last_date} |</b>\n\n"
+        last_date = datetime.datetime.strptime(last_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+        return f"<b>| {week_type} | {first_date} - {last_date} |</b>"
     
-    return f"<b>| {week_type} | {first_date} |</b>\n\n"
+    return f"<b>| {week_type} | {first_date} |</b>"
 
 
 def schedule_content(lesson: dict):
@@ -82,6 +104,8 @@ def format_schedule_day(data: dict) -> str:
     week_day = data.get('week_day', '')
     lessons: list = data.get('lessons', [])
 
+    # print(data)
+
 
     week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
     weekday_date = get_date_by_weekday(date, int(week_day))
@@ -99,6 +123,8 @@ def format_schedule_day(data: dict) -> str:
 
     for lesson in lessons:
         message += schedule_content(lesson)
+
+    message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
 
     
     return message
@@ -145,9 +171,8 @@ def format_schedule_weeks(data: dict, week_number=None) -> str:
         for lesson in lessons:
             message += schedule_content(lesson)
 
-
-    message += schedule_title(group)
     message += week_info(week_odd_even, week.get('date_start'), week.get('date_end'))
+    message += '\n'
     message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
 
     

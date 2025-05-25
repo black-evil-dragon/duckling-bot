@@ -1,3 +1,4 @@
+import json
 from sqlite3 import Error
 
 import sqlite3
@@ -100,21 +101,12 @@ class Database:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
             group_id INTEGER,
-            subgroup_id INTEGER
+            subgroup_id INTEGER,
+            user_settings TEXT
         );
         """
         self.execute_query(query, commit=True)
-        
-        # ! TEMP
-        # try:
-        #     self.execute_query("ALTER TABLE users ADD COLUMN group_id INTEGER;", commit=True)
-        # except Exception as e:
-        #     log.debug(f"Колонка group_id уже существует: {e}")
-        
-        # try:
-        #     self.execute_query("ALTER TABLE users ADD COLUMN subgroup_id INTEGER;", commit=True)
-        # except Exception as e:
-        #     log.debug(f"Колонка subgroup_id уже существует: {e}")
+
         
 
         log.info("Таблица users создана/обновлена")
@@ -129,8 +121,8 @@ class Database:
         query = """
             INSERT INTO users (
                 user_id, is_bot, first_name, last_name, username,
-                group_id, subgroup_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                group_id, subgroup_id, user_settings
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 first_name = excluded.first_name,
                 last_name = excluded.last_name,
@@ -144,8 +136,16 @@ class Database:
                     WHEN excluded.subgroup_id IS NOT NULL AND excluded.subgroup_id != '' 
                     THEN excluded.subgroup_id 
                     ELSE users.subgroup_id 
+                END,
+                user_settings = CASE
+                    WHEN excluded.user_settings IS NOT NULL AND excluded.user_settings != ''
+                    THEN excluded.user_settings
+                    ELSE users.user_settings
                 END
         """
+
+        user_settings = user_data.get("user_settings", {})
+        user_settings_json = json.dumps(user_settings) if user_settings else None
 
         params = (
             user_data.get("id"),
@@ -154,7 +154,9 @@ class Database:
             user_data.get("last_name", ""),
             user_data.get("username"),
             user_data.get("group_id"),
-            user_data.get("subgroup_id")
+            user_data.get("subgroup_id"),
+            user_settings_json  
+
         )
         
         
@@ -174,7 +176,26 @@ class Database:
         if cursor:
             row = cursor.fetchone()
             if row:
-                columns = ["user_id", "is_bot", "first_name", "last_name", "username", "created_at", "group_id", "subgroup_id",]
-                return dict(zip(columns, row))
+                columns = ["user_id", "is_bot", "first_name", "last_name", "username", "created_at", "group_id", "subgroup_id","user_settings"]
+                user_data = dict(zip(columns, row))
+                if user_data.get("user_settings"):
+                    try:
+                        user_data["user_settings"] = json.loads(user_data["user_settings"])
+                    except json.JSONDecodeError:
+                        user_data["user_settings"] = None
+                return user_data
         return None
+    
+
+
+    def update_user_settings(self, user_id: int, settings: Dict[str, Any]) -> bool:
+        """Обновляет только настройки пользователя"""
+        query = "UPDATE users SET user_settings = ? WHERE user_id = ?"
+        try:
+            self.execute_query(query, (json.dumps(settings), user_id), commit=True)
+            return True
+        except Exception as e:
+            log.error(f"Ошибка обновления настроек {user_id}: {e}")
+            return False
+
     # * |____________________________________________________________|

@@ -150,6 +150,7 @@ class GroupModule(BaseModule):
     @staticmethod
     @BaseModule.command_process(True)
     async def ask_subgroup(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        update_message = update.message or update.callback_query.message
         context.user_data.pop('selected_subgroup', None)
 
         context.user_data.update(dict(
@@ -157,16 +158,18 @@ class GroupModule(BaseModule):
             is_command_process=True
         ))
 
+        subgroups = list(SUBGROUP_IDS)
+
         buttons = [
             [
                 KeyboardButton(str(value))
-                for value in SUBGROUP_IDS[i:i+3]
-            ] for i in range(0, len(SUBGROUP_IDS), 3)
+                for value in subgroups[i:i+3]
+            ] for i in range(0, len(subgroups), 3)
         ]
 
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
-        await update.message.reply_text(
+        await update_message.reply_text(
             messages.choose_subgroup,
             reply_markup=reply_markup
         )
