@@ -1,5 +1,3 @@
-from core.data.group import Group
-
 from dotenv import load_dotenv, dotenv_values
 
 import requests
@@ -7,18 +5,22 @@ import logging
 import os
 import traceback
 
+from utils import config
+from core.session.decorators import try_repeat_catch
+from core.data.group import Group
+
 
 
 # Настройка логирования
 log = logging.getLogger("duckling")
 log.setLevel(logging.DEBUG)
 
+
+
 class Session:
     session: 'requests.Session' = None
 
-
-    # URL = "https://tt2.vogu35.ru/api"
-    URL = "http://127.0.0.1:8000/api"
+    URL = config.API_URL
 
 
     def __init__(self, id: int, key: str, refresh_token: str = None):
@@ -58,8 +60,17 @@ class Session:
             log.critical(f"!\tКритическая ошибка при инициализации сессии: {str(error)}")
             raise RuntimeError(f"Не удалось инициализировать сессию: {str(error)}")
         
+    # * |___________________________________________________________      
+
+
+
+
     # * ____________________________________________________________
     # * |                       Update data                          
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    )
     def get_all_groups(self):
         path = f'{self.URL}/group/get-tree/'
 
@@ -83,11 +94,17 @@ class Session:
 
         Group.save_to_json(group_ids)
 
-
     # * |___________________________________________________________
 
+
+
+
     # * ____________________________________________________________
-    # * |                 Http methods                                   
+    # * |                 Http methods                      
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    )             
     def post(self, path, data=None, json=None, **kwargs):
         url = f'{self.URL}/{path}'
         try:
@@ -143,8 +160,11 @@ class Session:
 
 
     # * ____________________________________________________________
-    # * |                       Session utils                            
-
+    # * |                       Session utils                
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    ) 
     def touch(self):
         path = f'{self.URL}/auth/'
 
@@ -161,6 +181,34 @@ class Session:
             raise Exception("Не удалось получить csrf токен")
         
 
+
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    ) 
+    def create_session(self):
+        path = f'{self.URL}/auth/'
+
+        log.info('\t| Авторизуемся по id и key')
+
+        #* - Авторизация соединения
+        response = self.session.post(path, json=dict(
+            id=self.auth_data.get("id"),
+            key=self.auth_data.get("key"),
+        ))
+
+
+        if response.json().get('success', False):
+            self.set_tokens(response)
+        else:
+            raise Exception("Не удалось авторизоваться на сервере")      
+
+
+
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    )     
     def check_session(self, is_first=False):
         path = f'{self.URL}/auth-check/'
 
@@ -179,6 +227,10 @@ class Session:
             
 
 
+    @try_repeat_catch(
+        max_attempts=5,
+        delay_seconds=2.0,
+    )   
     def update_tokens(self):
         path = f'{self.URL}/auth-update/'
 
@@ -190,7 +242,6 @@ class Session:
 
         response = self.session.get(path)
 
-
         if response.json().get('success', False):
             self.set_tokens(response)
             log.info('\t| Успешно!')
@@ -198,23 +249,5 @@ class Session:
         else:
             log.info('\t| Ошибка проверки токенов. Пробуем авторизоваться через id и key')
             self.create_session()
-
-
-    def create_session(self):
-        path = f'{self.URL}/auth/'
-
-        log.info('\t| Авторизуемся по id и key')
-
-        #* - Авторизация соединения
-        response = self.session.post(path, json=dict(
-            id=self.auth_data.get("id"),
-            key=self.auth_data.get("key"),
-        ))
-
-
-        if response.json().get('success', False):
-            self.set_tokens(response)
-        else:
-            raise Exception("Не удалось авторизоваться на сервере")
     # * |___________________________________________________________
 

@@ -129,7 +129,7 @@ class ScheduleModule(BaseModule):
 
             response_data: dict = ScheduleModule.fetch_data(session, "schedule/day/", params)
 
-            if 'last_update' in response_data:
+            if response_data.get('last_update'):
                 response_data['last_update'] = datetime.strptime(response_data['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
 
 
@@ -312,7 +312,7 @@ class ScheduleModule(BaseModule):
             await query.edit_message_text(messages.schedule_wihtout_data)
             return
         
-        if 'last_update' in response_data:
+        if response_data.get('last_update'):
             response_data['last_update'] = datetime.strptime(response_data['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
         schedule = dict(
             **prepare_schedule_day_data(response_data.get("data", {})),

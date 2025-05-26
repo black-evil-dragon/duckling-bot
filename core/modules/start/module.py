@@ -264,7 +264,7 @@ class StartModule(BaseModule):
         db.update_user_settings(user.id, user_settings)
 
         
-        if 'selected_subgroup' not in context.user_data or context.user_data.get('selected_subgroup') is None:
+        if context.user_data.get('selected_subgroup') is None and setting == 'subgroup_lock':
             await GroupModule.ask_subgroup(update, context)
 
 

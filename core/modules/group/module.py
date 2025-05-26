@@ -263,23 +263,21 @@ class GroupModule(BaseModule):
 
         groups_search = Group.find_group_by_name(groups=[group for group in groups], group_name=user_input)
 
-        
-        if user_input not in groups and not len(groups_search):
+
+        if groups.get(user_input) is not None:
+            group_id = groups[user_input]
+
+            context.user_data["selected_group"] = group_id
+            context.user_data['is_group_selection'] = False
+            context.user_data["is_command_process"] = False
+
+            user = update.effective_user
+            self.save_user_data(user, context)
+            
             await update.message.reply_text(
-                messages.group_wrong_choice,
+                messages.result_choices(institute, course, user_input),
                 reply_markup=ReplyKeyboardRemove()
             )
-
-            await self.ask_group(update, context)
-        elif len(groups_search) > 1:
-            buttons = [[KeyboardButton(group)] for group in groups_search]
-            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
-
-            await update.message.reply_text(
-                messages.choose_group,
-                reply_markup=reply_markup
-            )
-
         elif len(groups_search) == 1:
             group_id = groups[groups_search[0]]
 
@@ -295,20 +293,20 @@ class GroupModule(BaseModule):
                 reply_markup=ReplyKeyboardRemove()
             )
 
-        else:
-            group_id = groups[user_input]
+        elif len(groups_search) > 1:
+            buttons = [[KeyboardButton(group)] for group in groups_search]
+            reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
-            context.user_data["selected_group"] = group_id
-            context.user_data['is_group_selection'] = False
-            context.user_data["is_command_process"] = False
-
-            user = update.effective_user
-            self.save_user_data(user, context)
-            
             await update.message.reply_text(
-                messages.result_choices(institute, course, user_input),
+                messages.choose_group,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                messages.group_wrong_choice,
                 reply_markup=ReplyKeyboardRemove()
             )
+
 
 
     #* ---------- Select subgroup
