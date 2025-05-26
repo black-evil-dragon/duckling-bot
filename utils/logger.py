@@ -6,7 +6,7 @@ def setup_logger():
     logger = logging.getLogger("duckling")
     logger.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s]\t%(message)s")
+    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s]  %(message)s")
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)

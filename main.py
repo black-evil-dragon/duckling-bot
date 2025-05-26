@@ -24,7 +24,7 @@ class Bot:
     db_manager = None
 
 
-    def __init__(self, token: str, test_run: bool = False, db_filename: str = ''):
+    def __init__(self, token: str, api_id: str, api_key: str, test_run: bool = False, db_filename: str = ''):
         self.token = token
 
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
@@ -32,7 +32,10 @@ class Bot:
         #* Session
         if not test_run:
             #? В Github Actions мы не будем использовать сессии
-            self.session_manager: 'Session' = Session()
+            self.session_manager: 'Session' = Session(
+                id=api_id,
+                key=api_key,  
+            )
 
         self.app.bot_data.update({'session': self.session_manager})
 
@@ -79,20 +82,13 @@ class Bot:
 
 def main():
     try:
-        # * Окружение -----------------------------------------------------------
-        BOT_TOKEN = os.getenv('BOT_TOKEN')
-        TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
-        DB_FILENAME = os.getenv('DB_FILENAME', '')
-
-        log.debug(f'TEST_RUN: {TEST_RUN}')
-        log.debug(f'BOT_TOKEN FROM {"[env]" if BOT_TOKEN else "[config.py]"}')
-
-        if not BOT_TOKEN:
-            from utils.config import BOT_TOKEN
+        from utils.config import BOT_TOKEN, TEST_RUN, DB_FILENAME, API_KEY, API_ID
 
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
+            api_id=API_ID,
+            api_key=API_KEY,
             test_run=TEST_RUN,
             db_filename=DB_FILENAME
         )
