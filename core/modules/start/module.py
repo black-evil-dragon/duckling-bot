@@ -171,8 +171,7 @@ class StartModule(BaseModule):
         db: 'Database' = context.bot_data.get('db')
         user = update.effective_user
 
-        user_settings = db.get_user(user.id).get('user_settings', {})
-
+        user_settings: dict = db.get_user(user.id).get('user_settings', {})
                     
         SETTINGS_COMMANDS = (
             None,
@@ -261,12 +260,11 @@ class StartModule(BaseModule):
             setting: value
         })
 
-        print('query.data', query.data)
 
         db.update_user_settings(user.id, user_settings)
 
         
-        if 'selected_subgroup' not in context.user_data:
+        if 'selected_subgroup' not in context.user_data or context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
 
 

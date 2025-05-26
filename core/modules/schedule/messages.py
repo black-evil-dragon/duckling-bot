@@ -54,7 +54,7 @@ server_error = "Произошла ошибка при запросе к сер�
 
 # * TEMPLATES ___________________________________________________________________
 def schedule_title(title):
-    return f"<b>📅 Расписание группы {title}</b>\n"
+    return f"<b>📅 Расписание группы {title}</b>"
 
 
 def week_info(week_type, first_date, last_date=None):
@@ -112,8 +112,10 @@ def format_schedule_day(data: dict) -> str:
     weekday_name = WEEKDAYS.get(str(week_day), "EMPTY")
 
     message += schedule_title(group)
+    message += '\n'
     message += week_info(week_odd_even, date)
-    message += f"<b>{weekday_name} ({weekday_date})</b>\n"
+    message += '\n\n'
+    message += f"<b>{weekday_name}</b>\n"
 
 
     if not lessons:
@@ -153,6 +155,7 @@ def format_schedule_weeks(data: dict, week_number=None) -> str:
     week_odd_even = "Нечётная" if week['is_odd'] else "Чётная"
 
     message += schedule_title(group)
+    message += '\n'
     message += week_info(week_odd_even, week.get('date_start'), week.get('date_end'))
 
     for day_key in week.get('days', {}):

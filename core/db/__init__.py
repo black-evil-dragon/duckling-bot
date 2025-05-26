@@ -180,9 +180,12 @@ class Database:
                 user_data = dict(zip(columns, row))
                 if user_data.get("user_settings"):
                     try:
-                        user_data["user_settings"] = json.loads(user_data["user_settings"])
+                        user_data["user_settings"] = json.loads(user_data["user_settings"] or {}) 
                     except json.JSONDecodeError:
-                        user_data["user_settings"] = None
+                        user_data["user_settings"] = {}
+                else:
+                    user_data['user_settings'] = {}
+
                 return user_data
         return None
     
