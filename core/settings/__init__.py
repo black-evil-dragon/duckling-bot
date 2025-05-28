@@ -1,0 +1,1 @@
+from .commands import COMMANDS, setup_commands
