@@ -24,15 +24,16 @@ class Bot:
     db_manager = None
 
 
-    def __init__(self, token: str, test_run: bool = False, db_filename: str = ''):
+    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = ''):
         self.token = token
 
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
         #* Session
-        if not test_run:
-            #? В Github Actions мы не будем использовать сессии
-            self.session_manager: 'Session' = Session()
+        self.session_manager: 'Session' = Session(
+            id=api_id,
+            key=api_key,  
+        )
 
         self.app.bot_data.update({'session': self.session_manager})
 
@@ -79,22 +80,14 @@ class Bot:
 
 def main():
     try:
-        # * Окружение -----------------------------------------------------------
-        BOT_TOKEN = os.getenv('BOT_TOKEN')
-        TEST_RUN = os.getenv('TEST_RUN', 'false').lower() == 'true'
-        DB_FILENAME = os.getenv('DB_FILENAME', '')
-
-        log.debug(f'TEST_RUN: {TEST_RUN}')
-        log.debug(f'BOT_TOKEN FROM {"[env]" if BOT_TOKEN else "[config.py]"}')
-
-        if not BOT_TOKEN:
-            from utils.config import BOT_TOKEN
+        from utils.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
 
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
-            test_run=TEST_RUN,
-            db_filename=DB_FILENAME
+            api_id=API_ID,
+            api_key=API_KEY,
+            db_filename=DB_FILEPATH
         )
 
 
@@ -102,9 +95,6 @@ def main():
         try:
             from core.modules import setup_modules
             bot.setup_modules(setup_modules)
-
-            if TEST_RUN:
-                return log.info('Включен режим тестовый запуск')
             
             bot.run()
 
