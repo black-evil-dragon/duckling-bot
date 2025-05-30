@@ -158,10 +158,6 @@ class Session:
 
     # * ____________________________________________________________
     # * |                       Session utils                
-    @try_repeat_catch(
-        max_attempts=2,
-        delay_seconds=2.0,
-    ) 
     def touch(self):
         path = f'{self.URL}/auth/'
 
@@ -175,14 +171,11 @@ class Session:
         if response.json().get('success', False):
             self.set_csrf(response)
         else:
-            raise Exception("Не удалось получить csrf токен")
+            log.error("Не удалось получить csrf токен")
+            raise RuntimeError('Неудачная попытка авторизации. ID подключения отсутствует!')
         
 
 
-    @try_repeat_catch(
-        max_attempts=2,
-        delay_seconds=2.0,
-    ) 
     def create_session(self):
         path = f'{self.URL}/auth/'
 
@@ -202,10 +195,6 @@ class Session:
 
 
 
-    @try_repeat_catch(
-        max_attempts=2,
-        delay_seconds=2.0,
-    )     
     def check_session(self, is_first=False):
         path = f'{self.URL}/auth-check/'
 
@@ -223,11 +212,7 @@ class Session:
             self.update_tokens()
             
 
-
-    @try_repeat_catch(
-        max_attempts=2,
-        delay_seconds=2.0,
-    )   
+ 
     def update_tokens(self):
         path = f'{self.URL}/auth-update/'
 
