@@ -1,6 +1,4 @@
-from typing import List, Tuple
-from telegram import BotCommand
-from telegram.ext import Application, ApplicationBuilder
+from telegram.ext import  ApplicationBuilder
 
 from core.db import Database
 from core.settings import COMMANDS, setup_commands

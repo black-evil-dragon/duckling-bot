@@ -1,9 +1,7 @@
-from dotenv import load_dotenv, dotenv_values
+from dotenv import dotenv_values
 
 import requests
 import logging
-import os
-import traceback
 
 from utils import config
 from core.session.decorators import try_repeat_catch
@@ -67,15 +65,11 @@ class Session:
 
     # * ____________________________________________________________
     # * |                       Update data                          
-    @try_repeat_catch(
-        max_attempts=5,
-        delay_seconds=2.0,
-    )
     def get_all_groups(self):
-        path = f'{self.URL}/group/get-tree/'
+        path = 'group/get-tree/'
 
-        response = self.session.post(path)
-        response.raise_for_status()
+        response: 'requests.Response' = self.post(path)
+        
         
         response_data: dict = response.json()
 
@@ -102,27 +96,30 @@ class Session:
     # * ____________________________________________________________
     # * |                 Http methods                      
     @try_repeat_catch(
-        max_attempts=5,
+        max_attempts=2,
         delay_seconds=2.0,
     )             
-    def post(self, path, data=None, json=None, **kwargs):
+    def post(self, path, data=None, json=None, **kwargs) -> 'requests.Response':
         url = f'{self.URL}/{path}'
-        try:
+        response = self.session.post(url, data=data, json=json, **kwargs)
+        # log.debug(f'POST {path} - {response.status_code}')
+        
+        if response.status_code in [400, 403]:
+            log.warning(f"\tПолучен статус {response.status_code}, повторяем авторизацию")
+
+            self.check_session()
+
             response = self.session.post(url, data=data, json=json, **kwargs)
-            
-            if response.status_code in [400, 403]:
-                log.warning(f"\tПолучен статус {response.status_code}, повторяем авторизацию")
 
-                self.check_session()
+        elif response.status_code in [500]:
+            log.error(f"\tПолучен статус {response.status_code}, ошибка в работе сервера")
 
-                response = self.session.post(url, data=data, json=json, **kwargs)
-                
-            return response
+            if response.json().get('error', ""):
+                log.error(response.json().get('error', ""))
+
+            response.raise_for_status()
             
-        except Exception as error:
-            traceback.print_exc()
-            log.error(f"Ошибка при выполнении POST-запроса: {str(error)}")
-            raise
+        return response
     # * |___________________________________________________________
 
 
@@ -162,7 +159,7 @@ class Session:
     # * ____________________________________________________________
     # * |                       Session utils                
     @try_repeat_catch(
-        max_attempts=5,
+        max_attempts=2,
         delay_seconds=2.0,
     ) 
     def touch(self):
@@ -183,7 +180,7 @@ class Session:
 
 
     @try_repeat_catch(
-        max_attempts=5,
+        max_attempts=2,
         delay_seconds=2.0,
     ) 
     def create_session(self):
@@ -206,7 +203,7 @@ class Session:
 
 
     @try_repeat_catch(
-        max_attempts=5,
+        max_attempts=2,
         delay_seconds=2.0,
     )     
     def check_session(self, is_first=False):
@@ -228,7 +225,7 @@ class Session:
 
 
     @try_repeat_catch(
-        max_attempts=5,
+        max_attempts=2,
         delay_seconds=2.0,
     )   
     def update_tokens(self):
