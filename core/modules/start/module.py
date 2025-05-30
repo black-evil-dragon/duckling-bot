@@ -1,7 +1,11 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup, KeyboardButton, Update
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, Application
+from telegram import Update
+from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton
+
+from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes, Application
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
@@ -171,7 +175,10 @@ class StartModule(BaseModule):
         db: 'Database' = context.bot_data.get('db')
         user = update.effective_user
 
-        user_settings: dict = db.get_user(user.id).get('user_settings', {})
+        user_settings = {}
+
+        if db is not None:
+            user_settings = db.get_user(user.id).get('user_settings', {})
                     
         SETTINGS_COMMANDS = (
             None,
@@ -244,7 +251,10 @@ class StartModule(BaseModule):
         db: 'Database' = context.bot_data.get('db')
         user = update.effective_user
 
-        user_settings: dict = db.get_user(user.id).get('user_settings', {})
+        user_settings = {}
+
+        if db is not None:
+            user_settings = db.get_user(user.id).get('user_settings', {})
 
 
         command = query.data.split('#')[-1]
