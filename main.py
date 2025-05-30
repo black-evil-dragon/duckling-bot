@@ -1,6 +1,4 @@
-from typing import List, Tuple
-from telegram import BotCommand
-from telegram.ext import Application, ApplicationBuilder
+from telegram.ext import  ApplicationBuilder
 
 from core.db import Database
 from core.settings import COMMANDS, setup_commands
@@ -24,18 +22,16 @@ class Bot:
     db_manager = None
 
 
-    def __init__(self, token: str, api_id: str, api_key: str, test_run: bool = False, db_filename: str = ''):
+    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = ''):
         self.token = token
 
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
         #* Session
-        if not test_run:
-            #? В Github Actions мы не будем использовать сессии
-            self.session_manager: 'Session' = Session(
-                id=api_id,
-                key=api_key,  
-            )
+        self.session_manager: 'Session' = Session(
+            id=api_id,
+            key=api_key,  
+        )
 
         self.app.bot_data.update({'session': self.session_manager})
 
@@ -82,15 +78,14 @@ class Bot:
 
 def main():
     try:
-        from utils.config import BOT_TOKEN, TEST_RUN, DB_FILENAME, API_KEY, API_ID
+        from utils.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
 
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
             api_id=API_ID,
             api_key=API_KEY,
-            test_run=TEST_RUN,
-            db_filename=DB_FILENAME
+            db_filename=DB_FILEPATH
         )
 
 
@@ -98,9 +93,6 @@ def main():
         try:
             from core.modules import setup_modules
             bot.setup_modules(setup_modules)
-
-            if TEST_RUN:
-                return log.info('Включен режим тестовый запуск')
             
             bot.run()
 
