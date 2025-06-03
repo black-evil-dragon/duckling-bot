@@ -1,6 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import ReplyKeyboardMarkup, KeyboardButton, Update
+from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
 #* Core ________________________________________________________________________
@@ -89,7 +89,10 @@ class ScheduleModule(BaseModule):
     
         update_message = update.message or update.callback_query.message
         user = update.effective_user
-        user_settings: dict = db.get_user(user.id).get('user_settings', {}) or {}
+        user_settings = {}
+
+        if db is not None:
+            user_settings = db.get_user(user.id).get('user_settings', {})
         
         if not session:
             await update_message.reply_text(messages.session_error)
@@ -167,7 +170,10 @@ class ScheduleModule(BaseModule):
     
         update_message = update.message or update.callback_query.message
         user = update.effective_user
-        user_settings: dict = db.get_user(user.id).get('user_settings', {})
+        user_settings = {}
+
+        if db is not None:
+            user_settings = db.get_user(user.id).get('user_settings', {})
         
         
         if not session:
@@ -273,7 +279,10 @@ class ScheduleModule(BaseModule):
         query = update.callback_query
         user = update.effective_user
 
-        user_settings: dict = db.get_user(user.id).get('user_settings', {}) or {}
+        user_settings = {}
+
+        if db is not None:
+            user_settings = db.get_user(user.id).get('user_settings', {})
         
         await query.answer()
 

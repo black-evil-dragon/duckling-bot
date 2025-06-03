@@ -1,7 +1,17 @@
 from functools import wraps
+
 from typing import Any, Callable, Optional
 
 import time
+import logging
+
+
+
+# Настройка логирования
+log = logging.getLogger("duckling")
+log.setLevel(logging.DEBUG)
+
+
 
 def try_repeat_catch(
     max_attempts: int = 3,
@@ -15,17 +25,21 @@ def try_repeat_catch(
         def wrapper(*args, **kwargs):
             last_exception = None
             
+            
             for attempt in range(1, max_attempts + 1):
+                result = None
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
-                    last_exception = e
+                    log.error(f'Неудачная попытка выполнения! Повторяем попытку: {attempt}. Ошибка: {e}')
+
                     if attempt < max_attempts:
                         time.sleep(delay_seconds)
                         continue
                     
                     if on_failure is not None:
                         on_failure(attempt, e)
+
                     raise Exception(
                         f"Failed after {attempt} attempts. Last error: {str(e)}"
                     ) from e

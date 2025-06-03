@@ -5,7 +5,7 @@ import sqlite3
 
 
 #* Other packages ________________________________________________________________________
-from typing import Optional, Any, List, Dict, Tuple
+from typing import Optional, Any, Dict
 
 import logging
 
@@ -14,6 +14,7 @@ import logging
 
 log = logging.getLogger("duckling")
 log.setLevel(logging.DEBUG)
+
 
 
 class Database:
@@ -187,7 +188,7 @@ class Database:
                     user_data['user_settings'] = {}
 
                 return user_data
-        return None
+        return {}
     
 
 
