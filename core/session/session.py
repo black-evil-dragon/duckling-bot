@@ -3,7 +3,7 @@ from dotenv import dotenv_values
 import requests
 import logging
 
-from utils import config
+from core.settings import config
 from core.session.decorators import try_repeat_catch
 from core.data.group import Group
 

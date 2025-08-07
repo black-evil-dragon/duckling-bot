@@ -139,7 +139,7 @@ class StartModule(BaseModule):
 
             ("schedule", "Расписание", ScheduleModule.schedule_handler),
             ("today", "На сегодня", ScheduleModule.get_schedule_day) if user_settings.get('show_week', True) else ("week", "На неделю", ScheduleModule.get_schedule_week),
-            ("tomorrow", "На завтра", ScheduleModule.get_schedule_day),
+            ("tomorrow", "На завтра", ScheduleModule.get_schedule_next_day),
 
             ("set_group", "Установить группу", GroupModule.ask_institute),
             (None, None, None),
