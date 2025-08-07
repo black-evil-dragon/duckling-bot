@@ -78,7 +78,7 @@ class Bot:
 
 def main():
     try:
-        from utils.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
+        from core.settings.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
 
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
