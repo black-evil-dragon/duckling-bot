@@ -39,7 +39,7 @@ class ScheduleModule(BaseModule):
         application.add_handler(CommandHandler("schedule", self.schedule_handler))
         application.add_handler(CommandHandler("week", self.get_schedule_week))
         application.add_handler(CommandHandler("today", self.get_schedule_day))
-        application.add_handler(CommandHandler("tomorrow", self.get_schedule_day))
+        application.add_handler(CommandHandler("tomorrow", self.get_schedule_next_day))
 
         # Callback
         application.add_handler(CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day_"))
@@ -80,9 +80,18 @@ class ScheduleModule(BaseModule):
             await ScheduleModule.get_schedule_week(update, context)
         else:
             await ScheduleModule.get_schedule_day(update, context)
+            
+            
+    @staticmethod
+    async def get_schedule_next_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        context.user_data['need_tomorrow'] = True
+
+        await ScheduleModule.get_schedule_day(update, context)
+
 
 
     @staticmethod
+    @ensure_user_settings(need_update=True)
     async def get_schedule_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
         db: 'Database' = context.bot_data.get('db')
@@ -112,10 +121,12 @@ class ScheduleModule(BaseModule):
             next_date = today + timedelta(days=1) if today.weekday() != 5 else today + timedelta(days=2)
             
 
-            if 'tomorrow' in update_message.text or today.weekday() == 6:
+            if context.user_data.get('need_tomorrow', False) or today.weekday() == 6:
                 today = next_date
                 prev_date = today - timedelta(days=1) if today.weekday() != 0 else today - timedelta(days=2)
                 next_date = today + timedelta(days=1) if today.weekday() != 5 else today + timedelta(days=2)
+                
+                context.user_data.update(dict(need_tomorrow=False))
             
 
             params = {
