@@ -11,6 +11,7 @@ from telegram.ext import filters
 #* Core ________________________________________________________________________
 
 from core.db import Database
+from core.settings.commands import CommandNames
 
 from core.modules.base import BaseMessages, BaseModule
 from core.modules.base.decorators import ensure_user_settings
@@ -22,7 +23,6 @@ from core.modules.start import messages
 
 #* Other packages ________________________________________________________________________
 import logging
-
 
 
 
@@ -53,10 +53,10 @@ class StartModule(BaseModule):
             self.some_text
         ), group=-1) 
 
-        application.add_handler(CommandHandler("start", self.start))
-        application.add_handler(CommandHandler("help", self.help))
-        application.add_handler(CommandHandler("menu", self.get_menu))
-        application.add_handler(CommandHandler("settings", self.send_settings))
+        application.add_handler(CommandHandler(CommandNames.START, self.start))
+        application.add_handler(CommandHandler(CommandNames.HELP, self.help))
+        application.add_handler(CommandHandler(CommandNames.MENU, self.get_menu))
+        application.add_handler(CommandHandler(CommandNames.SETTINGS, self.send_settings))
 
 
         application.add_handler(CallbackQueryHandler(self.handle_settings, pattern="^settings#"))
@@ -82,7 +82,7 @@ class StartModule(BaseModule):
 
         if command in handler_map:
             await query.edit_message_text(
-                text="Окей! Повторное открытие меню:\n\n***/menu***",
+                text=messages.reopen_menu,
                 parse_mode='MARKDOWN',
                 reply_markup=None
             )

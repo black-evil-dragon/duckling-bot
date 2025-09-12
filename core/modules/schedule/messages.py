@@ -1,14 +1,26 @@
-import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from core.data.weekdays import WEEKDAYS
+from core.settings.commands import CommandNames
 from core.modules.schedule.formatters import get_date_by_weekday
 
+import logging
+import datetime
+
+
+
+log = logging.getLogger("duckling")
+log.setLevel(logging.DEBUG)
 
 
 
 # * KEYBOARDS ___________________________________________________________________
 def create_pagination_keyboard(callback_data: str, current_page: int, total_pages: int, entity='страница') -> 'InlineKeyboardMarkup':
+    """
+    Устаревшая функция
+    """
+    log.warning('[func - create_pagination_keyboard]: This method is deprecated. Use use_paginator instead')
+
     keyboard = []
 
     if current_page > 0:
@@ -21,7 +33,7 @@ def create_pagination_keyboard(callback_data: str, current_page: int, total_page
     return InlineKeyboardMarkup([keyboard])
 
 
-def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница') -> 'InlineKeyboardMarkup':
+def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница', additional_buttons: list = None) -> 'InlineKeyboardMarkup':
     """
     Более улучшеная функция
     """
@@ -35,19 +47,25 @@ def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None
     if next_key is not None:
         keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}_{next_key}"))
     
-    return InlineKeyboardMarkup([keyboard])
+    return InlineKeyboardMarkup([
+        keyboard,
+        additional_buttons if additional_buttons is not None else [],
+    ])
 
 
 
 # * TEXT ___________________________________________________________________
 
 schedule_not_found = "Расписание пустое"
-week_not_found = "Неделя не найдена. Обратитесь к администратору"
+schedule_without_data = f"Данные расписания отсутствуют. Запросите расписание снова /{CommandNames.SCHEDULE}"
+schedule_warning_cache = f"⚠️ Данные недели кешируются! Для получения актуального расписания необходимо запросить расписание снова /{CommandNames.WEEK}"
 
-schedule_wihtout_data = "Данные расписания отсутствуют. Запросите расписание снова /schedule"
+week_not_found = "Неделя не найдена. Обратитесь к администратору"
 
 
 session_error = "Произошла ошибка при установке сессии\n\nПопробуйте снова позже"
+
+
 server_error = "Произошла ошибка при запросе к серверу\n\nПопробуйте снова позже"
 
 
@@ -104,11 +122,8 @@ def format_schedule_day(data: dict) -> str:
     week_day = data.get('week_day', '')
     lessons: list = data.get('lessons', [])
 
-    # print(data)
-
 
     week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
-    weekday_date = get_date_by_weekday(date, int(week_day))
     weekday_name = WEEKDAYS.get(str(week_day), "EMPTY")
 
     message += schedule_title(group)

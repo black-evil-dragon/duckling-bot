@@ -9,13 +9,17 @@ from telegram.ext import filters
 
 #* Core ________________________________________________________________________
 from core.modules.base import BaseModule
-from core.data.group import GROUP_IDS, SUBGROUP_IDS, Group
+from core.modules.group import messages
+
+from core.settings.commands import CommandNames
+
+from core.data.group import SUBGROUP_IDS, Group
 from core.db import Database
 
 #* Other packages ________________________________________________________________________
 import logging
 
-from core.modules.group import messages
+
 
 
 
@@ -33,8 +37,8 @@ class GroupModule(BaseModule):
 
     def setup(self, application: 'Application'):
         # Command
-        application.add_handler(CommandHandler("set_group", GroupModule.ask_institute))
-        application.add_handler(CommandHandler("set_subgroup", GroupModule.ask_subgroup))
+        application.add_handler(CommandHandler(CommandNames.SET_GROUP, GroupModule.ask_institute))
+        application.add_handler(CommandHandler(CommandNames.SET_SUBGROUP, GroupModule.ask_subgroup))
 
         # Message
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_selection))

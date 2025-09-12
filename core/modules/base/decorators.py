@@ -16,14 +16,14 @@ def ensure_user_settings(is_await=True, need_update=False):
                 if context.bot_data.get('db'):
                     db: 'Database' = context.bot_data.get('db')
                     user = update.effective_user
-                
-                    user_data = {
-                        "id": user.id,
-                        "is_bot": user.is_bot,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "username": user.username,
-                    }
+                    
+                    user_data = dict(
+                        id=user.id,
+                        is_bot=user.is_bot,
+                        first_name=user.first_name,
+                        last_name=user.last_name,
+                        username=user.username,
+                    )
 
                     saved_data = db.get_user(user.id)
                     if saved_data:
