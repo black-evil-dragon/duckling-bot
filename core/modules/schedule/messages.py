@@ -33,6 +33,7 @@ def create_pagination_keyboard(callback_data: str, current_page: int, total_page
     return InlineKeyboardMarkup([keyboard])
 
 
+
 def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница', additional_buttons: list = None) -> 'InlineKeyboardMarkup':
     """
     Более улучшеная функция
@@ -40,17 +41,21 @@ def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None
     keyboard = []
 
     if prev_key is not None:
-        keyboard.append(InlineKeyboardButton(f"⬅️ {entity}", callback_data=f"{callback_data}_{prev_key}"))
+        keyboard.append(InlineKeyboardButton(f"⬅️ {entity}", callback_data=f"{callback_data}#{prev_key}"))
     
     keyboard.append(InlineKeyboardButton("📍 Меню", callback_data="delegate#menu"))
 
     if next_key is not None:
-        keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}_{next_key}"))
+        keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}#{next_key}"))
     
     return InlineKeyboardMarkup([
         keyboard,
         additional_buttons if additional_buttons is not None else [],
     ])
+
+
+def get_refresh_button(callback_data: str) -> 'InlineKeyboardButton':
+    return InlineKeyboardButton("🔄 Обновить", callback_data=callback_data)
 
 
 
@@ -141,7 +146,7 @@ def format_schedule_day(data: dict) -> str:
     for lesson in lessons:
         message += schedule_content(lesson)
 
-    message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
+    message += f"<i>Последнее обновление: {data.get('last_update', '')}\nПолучено: {datetime.datetime.now().time()}</i>"
 
     
     return message

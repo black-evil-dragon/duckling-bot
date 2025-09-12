@@ -56,8 +56,8 @@ class ScheduleModule(BaseModule):
         application.add_handler(CommandHandler(CommandNames.TOMORROW, self.get_schedule_next_day))
 
         # Callback
-        application.add_handler(CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day_"))
-        application.add_handler(CallbackQueryHandler(self.schedule_week_callback, pattern="^schedule_week_"))
+        application.add_handler(CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day#"))
+        application.add_handler(CallbackQueryHandler(self.schedule_week_callback, pattern="^schedule_week#"))
 
 
     # * ____________________________________________________________
@@ -76,7 +76,7 @@ class ScheduleModule(BaseModule):
 
         response.raise_for_status()
         
-        response_json = response.json()
+        response_json: dict = response.json()
         
         if response_json.get('last_update'):
             response_json['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
@@ -212,14 +212,15 @@ class ScheduleModule(BaseModule):
                 today += timedelta(days=1)
                 context.user_data.update(dict(need_tomorrow=False))
                 
-            
-
+            today_string = today.strftime("%Y-%m-%d")
+    
+    
             request = dict(
                 session=session,
                 path="schedule/day/",
                 params=ScheduleModule.get_schedule_query(
                     context.user_data,
-                    date=today.strftime("%Y-%m-%d"),
+                    date=today_string,
                 )
             )
             
@@ -245,6 +246,7 @@ class ScheduleModule(BaseModule):
                     prev_key=prev_key,
                     next_key=next_key,
 
+                    additional_buttons=[messages.get_refresh_button(f'schedule_day#{today_string}')]
                 )
             )
             
@@ -323,12 +325,6 @@ class ScheduleModule(BaseModule):
 
 
 
-    # * ____________________________________________________________
-    # * |               Message handlers                            |
-
-
-    # * |___________________________________________________________|
-
 
     # * ____________________________________________________________
     # * |               Callback handlers                            |
@@ -336,7 +332,7 @@ class ScheduleModule(BaseModule):
         query = update.callback_query
         await query.answer()
 
-        week_idx = int(query.data.split('_')[-1])
+        week_idx = int(query.data.split('#')[-1])
         
 
         data = context.user_data.get('schedule_weeks_data')
@@ -349,6 +345,7 @@ class ScheduleModule(BaseModule):
         prev_key = None if week_idx == 0 else week_idx - 1
         next_key = None if week_idx == len(data['data']) - 1 else week_idx + 1
         
+        
         await query.edit_message_text(
             text=message,
             parse_mode='HTML',
@@ -356,7 +353,8 @@ class ScheduleModule(BaseModule):
                 callback_data='schedule_week',
                 entity='Неделя',
                 prev_key=prev_key,
-                next_key=next_key, 
+                next_key=next_key,
+                
             )
         )
 
@@ -368,7 +366,8 @@ class ScheduleModule(BaseModule):
         session: 'Session' = context.bot_data.get('session')
         
         query = update.callback_query
-        query_date = datetime.strptime(query.data.split('_')[-1], "%Y-%m-%d")
+        query_data = query.data.split('#')
+        query_date = datetime.strptime(query_data[-1], "%Y-%m-%d")
         
         await query.answer()
 
@@ -377,13 +376,13 @@ class ScheduleModule(BaseModule):
             await query.edit_message_text(messages.session_error)
             return
 
-        
+        query_date_string = query_date.strftime("%Y-%m-%d")
         request = dict(
             session=session,
             path="schedule/day/",
             params=ScheduleModule.get_schedule_query(
                 context.user_data,
-                date=query_date.strftime("%Y-%m-%d"),
+                date=query_date_string,
             )
         )
             
@@ -414,6 +413,7 @@ class ScheduleModule(BaseModule):
                 prev_key=prev_key,
                 next_key=next_key,
 
+                additional_buttons=[messages.get_refresh_button(f'schedule_day#refresh#{query_date_string}')]
             )
         )
     # * |___________________________________________________________|
