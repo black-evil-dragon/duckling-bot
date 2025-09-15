@@ -81,11 +81,11 @@ class StartModule(BaseModule):
         }
 
         if command in handler_map:
-            await query.edit_message_text(
-                text=messages.reopen_menu,
-                parse_mode='MARKDOWN',
-                reply_markup=None
-            )
+            # await query.edit_message_text(
+            #     text=messages.reopen_menu,
+            #     parse_mode='MARKDOWN',
+            #     reply_markup=None
+            # )
             await handler_map[command](update, context)
 
         elif command == 'menu':
@@ -178,7 +178,7 @@ class StartModule(BaseModule):
         user_settings = {}
 
         if db is not None:
-            user_settings = db.get_user(user.id).get('user_settings', {})
+            user_settings: dict = db.get_user(user.id).get('user_settings', {})
                     
         SETTINGS_COMMANDS = (
             None,
@@ -187,6 +187,7 @@ class StartModule(BaseModule):
                 f"Только подгруппа {'✅' if user_settings.get('subgroup_lock', False) else '❌'}",
             ),
             None,
+
 
             # Связанные настройки, если включен один, другой выключить
             (
@@ -199,6 +200,15 @@ class StartModule(BaseModule):
                 f"П.у день {'✅' if not user_settings.get('show_week', True) else '❌'}",
             ),
 
+
+            None,
+            (
+                f"settings#bool${not user_settings.get('morning_reminder', False)}$morning_reminder",
+                f"📢 Рассылка {'✅' if user_settings.get('morning_reminder', False) else '❌'}",
+            ),
+            None,
+
+
             None,
             ("delegate#menu", "📍 Меню"),
             None,
@@ -208,6 +218,7 @@ class StartModule(BaseModule):
             [InlineKeyboardButton(text=command[1], callback_data=f"{command[0]}") for command in SETTINGS_COMMANDS[i:i+3] if command] 
             for i in range(0, len(SETTINGS_COMMANDS), 3)
         ])
+
 
     @classmethod
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
@@ -221,6 +232,8 @@ class StartModule(BaseModule):
         )
 
     # * |___________________________________________________________|
+
+
 
     # * ____________________________________________________________
     # * |               Message handlers                            |
@@ -239,10 +252,11 @@ class StartModule(BaseModule):
     # * |___________________________________________________________|
 
 
+
     # * ____________________________________________________________
     # * |               Callback handlers                            |
     @staticmethod
-    @ensure_user_settings()
+    @ensure_user_settings(need_update=True)
     async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):      
         update_message = update.message or update.callback_query.message
         query = update.callback_query
@@ -251,10 +265,7 @@ class StartModule(BaseModule):
         db: 'Database' = context.bot_data.get('db')
         user = update.effective_user
 
-        user_settings = {}
-
-        if db is not None:
-            user_settings = db.get_user(user.id).get('user_settings', {})
+        user_settings: dict = context.user_data.get('user_settings', {})
 
 
         command = query.data.split('#')[-1]

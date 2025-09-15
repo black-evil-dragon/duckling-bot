@@ -1,6 +1,5 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from typing import Tuple
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
@@ -20,6 +19,7 @@ from . import messages
 #* Other packages ________________________________________________________________________
 from datetime import datetime, timedelta
 from datetime import date as DateType
+from typing import Tuple
 
 import logging
 import traceback

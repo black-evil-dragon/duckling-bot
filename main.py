@@ -1,13 +1,18 @@
+import asyncio
 from telegram.ext import  ApplicationBuilder
 
 from core.db import Database
 from core.settings import COMMANDS, setup_commands
-
 from core.session import Session
+
+
 from utils.logger import setup_logger
+from utils.scheduler import JobManager
+
 
 import os
 import logging
+
 
 
 from dotenv import load_dotenv
@@ -15,6 +20,8 @@ load_dotenv()
 
 
 log: 'logging.Logger' = None
+job_manager = JobManager()
+            
 
 class Bot:
 
@@ -43,12 +50,13 @@ class Bot:
 
     async def post_init(self, application):
         await setup_commands(application, COMMANDS)
+        job_manager.start()
             
 
     # * ____________________________________________________________
     # * |                       Setups                              |
-    def setup_modules(self, modules_config):
-        modules_config(self.app)
+    def setup_modules(self, modules_config, job_manager=job_manager):
+        modules_config(self.app, job_manager=job_manager)
         log.info("Модули установлены")
 
 
@@ -92,12 +100,14 @@ def main():
         # * Подключаем модули и запускаем ----------------------------------------
         try:
             from core.modules import setup_modules
+            
+
             bot.setup_modules(setup_modules)
             
             bot.run()
 
         except Exception as error:
-            return log.error(f'Не удалось загрузить модули: {str(error)}')
+            return log.exception(f'Не удалось загрузить модули: {str(error)}')
         
 
     except ImportError:

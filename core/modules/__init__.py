@@ -3,10 +3,17 @@ from telegram.ext import Application
 
 from core.modules.base import BaseModule
 from core.modules.group.module import GroupModule
+from core.modules.reminder.module import ReminderModule
 from core.modules.schedule import ScheduleModule
 from core.modules.start.module import StartModule
 
-def setup_modules(application: 'Application'):
+import logging
+
+log = logging.getLogger("duckling")
+log.setLevel(logging.DEBUG)
+
+
+def setup_modules(application: 'Application', job_manager=None):
     """
     Иницилизация модулей
     """
@@ -14,7 +21,11 @@ def setup_modules(application: 'Application'):
         ScheduleModule(),
         GroupModule(),
         StartModule(),
+        ReminderModule(job_manager=job_manager),
     ]
 
     for module in modules:
-        module.setup(application)
+        try:
+            module.setup(application)
+        except Exception:
+            log.exception(f"Ошибка при инициализации модуля {module}")
