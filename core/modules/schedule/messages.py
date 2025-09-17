@@ -61,7 +61,7 @@ def get_refresh_button(callback_data: str) -> 'InlineKeyboardButton':
 
 schedule_not_found = "Расписание пустое"
 schedule_without_data = f"Данные расписания отсутствуют. Запросите расписание снова /{CommandNames.SCHEDULE}"
-schedule_warning_cache = f"⚠️ Данные недели кешируются! Для получения актуального расписания необходимо запросить расписание снова /{CommandNames.WEEK}"
+schedule_warning_cache = f"⚠️ Данные недели кешируются! Для получения актуального расписания необходимо запросить расписание снова /{CommandNames.WEEK}\nТакже вы можете получить расписание на сегодня /{CommandNames.TODAY}"
 
 week_not_found = "Неделя не найдена. Обратитесь к администратору"
 

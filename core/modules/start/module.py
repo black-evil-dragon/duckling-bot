@@ -9,8 +9,6 @@ from telegram.ext import ContextTypes, Application
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
-
-from core.db import Database
 from core.models.user import User
 from core.settings.commands import CommandNames
 
@@ -35,9 +33,6 @@ class StartModule(BaseModule):
 
     application: 'Application' = None
 
-
-    def __init__(self) -> None:
-        log.info("StartModule установлен")
 
 
     def setup(self, application: 'Application') -> None:
@@ -79,11 +74,6 @@ class StartModule(BaseModule):
         }
 
         if command in handler_map:
-            # await query.edit_message_text(
-            #     text=messages.reopen_menu,
-            #     parse_mode='MARKDOWN',
-            #     reply_markup=None
-            # )
             await handler_map[command](update, context)
 
         elif command == 'menu':
@@ -128,7 +118,7 @@ class StartModule(BaseModule):
 
     @classmethod
     def get_menu_commands(cls, context: 'ContextTypes.DEFAULT_TYPE'):
-        user_settings = context.user_data.get('user_settings', {})
+        user_settings: dict = context.user_data.get('user_settings', {})
 
         MENU_COMMANDS = (
             (None, None, None),
@@ -170,13 +160,8 @@ class StartModule(BaseModule):
     @classmethod
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        db: 'Database' = context.bot_data.get('db')
-        user = update.effective_user
+        user_settings: dict = context.user_data.get('user_settings', {})
 
-        user_settings = {}
-
-        if db is not None:
-            user_settings: dict = db.get_user(user.id).get('user_settings', {})
                     
         SETTINGS_COMMANDS = (
             None,
@@ -258,18 +243,16 @@ class StartModule(BaseModule):
     async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):      
         update_message = update.message or update.callback_query.message
         query = update.callback_query
+
         await query.answer()
-
-        user = update.effective_user
-        user_model: User = context.user_data.get('user_model', None)
-
+        
+        user: User = context.user_data.get('user_model')
         user_settings: dict = context.user_data.get('user_settings', {})
-
-
+        
+        
         command = query.data.split('#')[-1]
-
         value_type, value, setting = command.split('$')
-
+        
 
         if value_type == 'bool':
             value = True if value == 'True' else False
@@ -280,8 +263,7 @@ class StartModule(BaseModule):
         })
 
 
-        # db.update_user_settings(user.id, user_settings)
-        user_model.set_user_settings(user_settings)
+        user.set_user_settings(user_settings)
 
         
         if context.user_data.get('selected_subgroup') is None and setting == 'subgroup_lock':

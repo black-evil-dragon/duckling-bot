@@ -22,23 +22,20 @@ class ReminderModule(BaseModule):
     
     job_manager: 'JobManager' = None
     
-    def __init__(self, job_manager: 'JobManager' = None):
-        log.info("ReminderModule установлен")
         
+    # if job_manager is not None:
+    #     self.job_manager = job_manager
         
-        # if job_manager is not None:
-        #     self.job_manager = job_manager
-            
-        #     self.job_manager.create_cron_job(
-        #         'monday-broadcast',
-        #         callback=self.morning_broadcast,
-        #         time_data=dict(seconds=5)
-        #     )
+    #     self.job_manager.create_cron_job(
+    #         'monday-broadcast',
+    #         callback=self.morning_broadcast,
+    #         time_data=dict(seconds=5)
+    #     )
         
         
         
     def setup(self, application: 'Application'):
-        pass
+        self.job_manager = application.bot_data.get('job_manager', None)
     
     
     

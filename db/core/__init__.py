@@ -67,7 +67,7 @@ class Database:
             session.close()
 
     @classmethod
-    def dispose(cls) -> None:
+    def close(cls) -> None:
         if cls._SessionFactory is not None:
             try:
                 cls._SessionFactory.remove()
@@ -100,7 +100,7 @@ class Database:
     @classmethod
     def __del__(cls) -> None:
         log.debug("+ Деструктор Database вызван")
-        cls.dispose()
+        cls.close()
 
     @classmethod
     def is_initialized(cls) -> bool:

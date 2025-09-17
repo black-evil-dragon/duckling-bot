@@ -26,6 +26,24 @@ class User(BaseModel):
             return f"{self.first_name} {self.last_name}"
         else:
             return self.first_name
+        
+        
+    def get_selected_data(self):
+        return dict(
+            selected_institute=self.group_id,
+            selected_group=self.group_id,
+            selected_subgroup=self.subgroup_id,
+        )
+        
+    def set_group(self, selected_group):
+        self.group_id = selected_group
+        self.save()
+        
+        
+    def set_subgroup(self, selected_subgroup):
+        self.subgroup_id = selected_subgroup
+        self.save()
+        
 
     def get_user_settings(self):
         try:

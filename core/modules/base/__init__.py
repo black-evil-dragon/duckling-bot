@@ -33,6 +33,12 @@ class BaseMessages:
 class BaseModule:
     def __init__(self) -> None:
         pass
+    
+    def __repr__(self):
+        return f"<class {self.__class__.__name__}>"
+    
+    def __str__(self):
+        return f"<{self.__class__.__name__}>"
 
     def setup(self, application: 'Application') -> None:
         raise Exception('Функция не переопределена')

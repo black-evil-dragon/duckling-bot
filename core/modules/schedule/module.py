@@ -19,7 +19,7 @@ from . import messages
 #* Other packages ________________________________________________________________________
 from datetime import datetime, timedelta
 from datetime import date as DateType
-from typing import Tuple
+from typing import Optional, Tuple
 from utils.logger import get_logger
 
 
@@ -44,10 +44,6 @@ class ScheduleModule(BaseModule):
         SATURDAY = 5
         SUNDAY = 6
     
-    
-
-    def __init__(self):
-        log.info("ScheduleModule установлен")
 
 
     def setup(self, application: Application):

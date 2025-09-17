@@ -1,5 +1,6 @@
 #
 # * DB packages ____________________________________________
+from ast import Dict
 from db.core import Database
 from db.core.manager import BaseManager, ManagerDescriptor
 
@@ -116,11 +117,32 @@ class BaseModel(DeclarativeBase):
 
     def save(self):
         with Database.session_scope() as session:
-            obj = self.get_by_id(self.id)
-            session.add(self)
+            merged_obj = session.merge(self)
+            session.flush()
+            session.refresh(merged_obj)
+            return merged_obj
+        
+    def update(self, obj_id: int, data: dict) -> Optional[T]:        
+        with Database.session_scope() as session:
+            for key, value in data.items():
+                setattr(self, key, value)
+                
+            merged_obj = session.merge(self)
+            session.flush()
+            session.refresh(merged_obj)
+
+            return merged_obj
+
+        with Database.session_scope() as session:
+            obj = self.model.get_by_id(obj_id, session)
+            if obj is None:
+                return None
+            
             session.flush()
             session.refresh(obj)
             return obj
+        
+    # TRASH ----------
         
     
     @classmethod
@@ -128,6 +150,8 @@ class BaseModel(DeclarativeBase):
         """Создать все таблицы в БД."""
         engine = Database.get_engine()
         cls.metadata.create_all(bind=engine)
+        
+        log.debug(f'+ Созданы таблицы: {cls}')
 
 
     @classmethod

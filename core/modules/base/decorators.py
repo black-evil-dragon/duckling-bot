@@ -36,13 +36,14 @@ def ensure_user_settings(is_await=True, need_update=False):
                 
                 user_data.update(dict(
                     is_user_loaded=True,
+                    
                     user_model=user_model,
+                    user_settings=user_model.get_user_settings(),
+                    
+                    **user_model.get_selected_data(),
                 ))
 
                 context.user_data.update({**user_data})
-                
-                context.__setattr__('User', user_model)
-                # context.user_data.get('user_mdel').method()
 
             return update, context
 

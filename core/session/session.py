@@ -39,20 +39,20 @@ class Session:
 
 
             if self.auth_data.get('refresh_token') is None:
-                log.info('-\t| Токены отсутствуют')
+                log.info('| Токены отсутствуют')
                 self.create_session()
 
             else:
                 self.check_session(is_first=True)
             
-            log.info("+\tСессия успешно инициализирована")
+            log.info("+ Сессия успешно инициализирована")
 
 
             self.get_all_groups()
 
             
         except Exception as error:
-            log.critical(f"!\tКритическая ошибка при инициализации сессии: {str(error)}")
+            log.critical(f"! Критическая ошибка при инициализации сессии: {str(error)}")
             raise RuntimeError(f"Не удалось инициализировать сессию: {str(error)}")
         
     # * |___________________________________________________________      
@@ -102,14 +102,14 @@ class Session:
         # log.debug(f'POST {path} - {response.status_code}')
         
         if response.status_code in [400, 403]:
-            log.warning(f"\tПолучен статус {response.status_code}, повторяем авторизацию")
+            log.warning(f"| Получен статус {response.status_code}, повторяем авторизацию")
 
             self.check_session()
 
             response = self.session.post(url, data=data, json=json, **kwargs)
 
         elif response.status_code in [500]:
-            log.error(f"\tПолучен статус {response.status_code}, ошибка в работе сервера")
+            log.error(f"| Получен статус {response.status_code}, ошибка в работе сервера")
 
             if response.json().get('error', ""):
                 log.error(response.json().get('error', ""))
@@ -158,7 +158,7 @@ class Session:
     def touch(self):
         path = f'{self.URL}/auth/'
 
-        log.info('\t| Установка соединения')
+        log.info('| Установка соединения')
 
         # - Получение csrf токена
         response = self.session.get(path, params=dict(
@@ -168,7 +168,7 @@ class Session:
         if response.json().get('success', False):
             self.set_csrf(response)
         else:
-            log.error("Не удалось получить csrf токен")
+            log.error("| Не удалось получить csrf токен")
             raise RuntimeError('Неудачная попытка авторизации. ID подключения отсутствует!')
         
 
@@ -176,7 +176,7 @@ class Session:
     def create_session(self):
         path = f'{self.URL}/auth/'
 
-        log.info('\t| Авторизуемся по id и key')
+        log.info('| Авторизуемся по id и key')
 
         #* - Авторизация соединения
         response = self.session.post(path, json=dict(
@@ -195,7 +195,7 @@ class Session:
     def check_session(self, is_first=False):
         path = f'{self.URL}/auth-check/'
 
-        log.info('\t| Проверяем актуальность токенов авторизации')
+        log.info('| Проверяем актуальность токенов авторизации')
 
         if is_first: return self.update_tokens()
             
@@ -203,7 +203,7 @@ class Session:
         response = self.session.get(path)
 
         if response.json().get('success', False):
-            log.info('\t| Успешно!')
+            log.info('| Успешно!')
 
         else:
             self.update_tokens()
@@ -213,7 +213,7 @@ class Session:
     def update_tokens(self):
         path = f'{self.URL}/auth-update/'
 
-        log.info('\t| Обновление токенов через refresh-токен')
+        log.info('| Обновление токенов через refresh-токен')
 
         self.session.headers.update({
             'Authorization': f"Bearer {self.auth_data.get('refresh_token')}"
@@ -223,10 +223,10 @@ class Session:
 
         if response.json().get('success', False):
             self.set_tokens(response)
-            log.info('\t| Успешно!')
+            log.info('| Успешно!')
 
         else:
-            log.info('\t| Ошибка проверки токенов. Пробуем авторизоваться через id и key')
+            log.warning('| Ошибка проверки токенов. Пробуем авторизоваться через id и key')
             self.create_session()
     # * |___________________________________________________________
 

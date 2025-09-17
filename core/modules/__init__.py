@@ -13,19 +13,23 @@ from typing import List
 log = get_logger()
 
 
-def setup_modules(application: 'Application', job_manager=None):
+def setup_modules(application: 'Application'):
     """
     Иницилизация модулей
     """
+    log.info('Иницилизация модулей')
     modules: List[BaseModule] = [
         ScheduleModule(),
         GroupModule(),
         StartModule(),
-        ReminderModule(job_manager=job_manager),
+        ReminderModule(),
     ]
 
     for module in modules:
         try:
             module.setup(application)
+            log.info(f'| {module} - установлен')
+
         except Exception:
-            log.exception(f"Ошибка при инициализации модуля {module}")
+            log.error(f"| {module} - ошибка при инициализации модуля")
+            log.exception('| Ошибка:')

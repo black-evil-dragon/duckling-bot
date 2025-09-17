@@ -1,92 +1,96 @@
+#
+#* Telegram bot framework ________________________________________________________________________
 from telegram.ext import  ApplicationBuilder
 
+
+#* DB ________________________________________________________________________
 from db.core import Database
 
-from core.db import Database as DeprecatedDatabase
+
+#* Core ________________________________________________________________________
 from core.models.user import User
 
 from core.settings import COMMANDS, setup_commands
 from core.session import Session
 
 
-from dotenv import load_dotenv
+#* Other packages ________________________________________________________________________
 from utils.logger import setup_logger
 from utils.scheduler import JobManager
 
+from dotenv import load_dotenv
 
 import os
 import logging
 
 
 
-load_dotenv() 
 
-
-log: 'logging.Logger' = None
-job_manager = JobManager()
             
 
 class Bot:
 
     session_manager: 'Session' = None
-    db_manager = None
+    job_manager: 'JobManager' = None
 
 
-    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = ''):
+
+    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = 'db.sqlite3'):
         self.token = token
 
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
-        #* Session
+        # * Session
         self.session_manager: 'Session' = Session(
             id=api_id,
             key=api_key,  
         )
-
         self.app.bot_data.update({'session': self.session_manager})
 
+        # * Job manager
+        self.job_manager = JobManager()
+        self.app.bot_data.update({'job_manager': self.job_manager})
+        
 
-        #* Database
-        if db_filename:
-            self.setup_database(db_filename)
+        # * Database
+        self.setup_database(db_filename)
+        # self.app.bot_data.update({'database': Database}) # ? Это вообще нужно?
 
 
     async def post_init(self, application):
         await setup_commands(application, COMMANDS)
-        job_manager.start()
+        self.job_manager.start()
             
 
     # * ____________________________________________________________
     # * |                       Setups                              |
-    def setup_modules(self, modules_config, job_manager=job_manager):
-        modules_config(self.app, job_manager=job_manager)
-        log.info("+ Модули установлены")
+    def setup_modules(self, modules_config):
+        modules_config(self.app)
+        # log.info("+ Модули установлены")
 
 
-    def setup_database(self, filename='db.sqlite3'):
+    def setup_database(self, filename):
         try:
+            log.info('Подключение к базе данных')
             if not os.path.exists(filename):
-                # raise FileNotFoundError(f"Файл {filename} не найден")
-                log.error(f'Файл {filename} не найден!')
+                log.error(f'| Файл {filename} не найден!')
                 
                 open(filename, 'w').close()
-                log.info(f'Создан новый файл базы данных: {filename}')
-                
+                log.info(f'| Создан новый файл базы данных: {filename}')
             
-            self.db_manager = DeprecatedDatabase(filename=filename)
-            self.app.bot_data.update({'db': self.db_manager})
-            
-            filename = 'db_test.sqlite3'
+        
+            # Init db
             Database.init(url=f'sqlite:///{filename}')
-            # Database.init(url='postgresql:///user:password@localhost/dbname')
+
+            # Create tables
             User.create_all()
-            log.debug(f'+ Созданы таблицы в базе данных: {User}')
+
 
 
             log.info(f'+ База данных успешно подключена к файлу: {filename}')
 
         except Exception as e:
-            log.error(f'- Не удалось загрузить базу данных: {e}')
+            log.error(f'+ Не удалось загрузить базу данных: {e}')
 
     # * |___________________________________________________________|
 
@@ -103,7 +107,7 @@ class Bot:
 def main():
     try:
         from core.settings.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
-
+        
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
@@ -129,12 +133,15 @@ def main():
     except ImportError:
         log.error('Не найден файл конфигурации [./utils/config.py].')
         log.error('| - Создайте файл конфигурации на основе [./utils/config.template.py]')
-        return 
+        return
     
     
 
 
 if __name__ == "__main__":
+    load_dotenv() 
+
+    log: 'logging.Logger' = None
     log = setup_logger()
 
     main()
