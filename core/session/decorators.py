@@ -1,15 +1,11 @@
 from functools import wraps
-
 from typing import Any, Callable, Optional
+from utils.logger import get_logger
 
 import time
-import logging
 
 
-
-# Настройка логирования
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 

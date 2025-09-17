@@ -3,14 +3,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from core.data.weekdays import WEEKDAYS
 from core.settings.commands import CommandNames
 from core.modules.schedule.formatters import get_date_by_weekday
+from utils.logger import get_logger
 
-import logging
 import datetime
 
 
-
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 

@@ -19,7 +19,7 @@ class JobManager:
         
     
     def start(self):
-        log.info('- Запускаем планировщик...')
+        log.info('Запускаем планировщик...')
         self._started = True
         self.scheduler.start()
         

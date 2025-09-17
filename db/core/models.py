@@ -5,6 +5,7 @@ from db.core.manager import BaseManager, ManagerDescriptor
 
 from sqlalchemy import Column, DateTime, func, Integer
 
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import DeclarativeBase
 
@@ -14,11 +15,11 @@ from sqlalchemy.ext.declarative import declared_attr
 
 # * Other packages ____________________________________________
 from typing import Type, TypeVar, List, Optional, Any
-
+import logging
 
 
 T = TypeVar("T", bound="BaseModel")
-
+log = logging.getLogger("duckling")
 
 class BaseModel(DeclarativeBase):
     __abstract__ = True
@@ -54,7 +55,6 @@ class BaseModel(DeclarativeBase):
 
     # * _______________________________________________________
     # * |                   Base fields
-
     id = Column(
         Integer,
         primary_key=True,
@@ -78,17 +78,51 @@ class BaseModel(DeclarativeBase):
 
     # * _______________________________________________________
     # * |                   Class methods    
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        fields = []
+    
+        if hasattr(self, "__str__"):
+            fields.append(f"{self.__str__()}")
+            
+        fields_str = ", ".join(fields)
+        return f"<{cls_name}: {fields_str}>"
 
+    def __str__(self):
+        cls_name = self.__class__.__name__
+        return f"<{cls_name} object {self.id}>"
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        if hasattr(self, "id") and hasattr(other, "id"):
+            return self.id == other.id
+        return False
 
     
     
     
     # * _______________________________________________________
     # * |                   Management          
-
     objects = ManagerDescriptor(BaseManager)
+    
+    @property
+    def pk(self):
+        return self.id
+    
+    
+    def to_dict(self) -> dict:
+        return {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
 
-
+    def save(self):
+        with Database.session_scope() as session:
+            obj = self.get_by_id(self.id)
+            session.add(self)
+            session.flush()
+            session.refresh(obj)
+            return obj
+        
+    
     @classmethod
     def create_all(cls) -> None:
         """Создать все таблицы в БД."""
@@ -106,7 +140,7 @@ class BaseModel(DeclarativeBase):
     @classmethod
     def get_by_id(cls: Type[T], obj_id: int, session: Session) -> Optional[T]:
         """Получить объект по id."""
-        return session.query(cls).get(obj_id)
+        return session.get(cls, obj_id)
 
 
     @classmethod

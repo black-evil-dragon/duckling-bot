@@ -1,11 +1,15 @@
-import asyncio
 from telegram.ext import  ApplicationBuilder
 
-from core.db import Database
+from db.core import Database
+
+from core.db import Database as DeprecatedDatabase
+from core.models.user import User
+
 from core.settings import COMMANDS, setup_commands
 from core.session import Session
 
 
+from dotenv import load_dotenv
 from utils.logger import setup_logger
 from utils.scheduler import JobManager
 
@@ -15,7 +19,6 @@ import logging
 
 
 
-from dotenv import load_dotenv
 load_dotenv() 
 
 
@@ -57,20 +60,33 @@ class Bot:
     # * |                       Setups                              |
     def setup_modules(self, modules_config, job_manager=job_manager):
         modules_config(self.app, job_manager=job_manager)
-        log.info("Модули установлены")
+        log.info("+ Модули установлены")
 
 
-    def setup_database(self, filename):
+    def setup_database(self, filename='db.sqlite3'):
         try:
-            if not os.path.exists(filename): raise FileNotFoundError(f"Файл {filename} не найден")
+            if not os.path.exists(filename):
+                # raise FileNotFoundError(f"Файл {filename} не найден")
+                log.error(f'Файл {filename} не найден!')
+                
+                open(filename, 'w').close()
+                log.info(f'Создан новый файл базы данных: {filename}')
+                
             
-            self.db_manager = Database(filename=filename)
+            self.db_manager = DeprecatedDatabase(filename=filename)
             self.app.bot_data.update({'db': self.db_manager})
+            
+            filename = 'db_test.sqlite3'
+            Database.init(url=f'sqlite:///{filename}')
+            # Database.init(url='postgresql:///user:password@localhost/dbname')
+            User.create_all()
+            log.debug(f'+ Созданы таблицы в базе данных: {User}')
 
-            log.info(f'База данных успешно подключена к файлу: {filename}')
+
+            log.info(f'+ База данных успешно подключена к файлу: {filename}')
 
         except Exception as e:
-            log.error(f'Не удалось загрузить базу данных: {e}')
+            log.error(f'- Не удалось загрузить базу данных: {e}')
 
     # * |___________________________________________________________|
 

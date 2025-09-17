@@ -11,6 +11,7 @@ from telegram.ext import filters
 #* Core ________________________________________________________________________
 
 from core.db import Database
+from core.models.user import User
 from core.settings.commands import CommandNames
 
 from core.modules.base import BaseMessages, BaseModule
@@ -22,13 +23,10 @@ from core.modules.schedule.module import ScheduleModule
 from core.modules.start import messages
 
 #* Other packages ________________________________________________________________________
-import logging
+from utils.logger import get_logger
 
 
-
-
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 
@@ -39,7 +37,7 @@ class StartModule(BaseModule):
 
 
     def __init__(self) -> None:
-        log.info("StartModule initialized")
+        log.info("StartModule установлен")
 
 
     def setup(self, application: 'Application') -> None:
@@ -262,8 +260,8 @@ class StartModule(BaseModule):
         query = update.callback_query
         await query.answer()
 
-        db: 'Database' = context.bot_data.get('db')
         user = update.effective_user
+        user_model: User = context.user_data.get('user_model', None)
 
         user_settings: dict = context.user_data.get('user_settings', {})
 
@@ -282,7 +280,8 @@ class StartModule(BaseModule):
         })
 
 
-        db.update_user_settings(user.id, user_settings)
+        # db.update_user_settings(user.id, user_settings)
+        user_model.set_user_settings(user_settings)
 
         
         if context.user_data.get('selected_subgroup') is None and setting == 'subgroup_lock':

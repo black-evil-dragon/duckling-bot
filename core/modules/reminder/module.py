@@ -8,16 +8,11 @@ from core.modules.base import BaseModule
 
 
 #* Other packages ________________________________________________________________________
+from utils.logger import get_logger
 from utils.scheduler import JobManager
 
 
-import logging
-import threading
-import time
-
-
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 
@@ -28,17 +23,17 @@ class ReminderModule(BaseModule):
     job_manager: 'JobManager' = None
     
     def __init__(self, job_manager: 'JobManager' = None):
-        log.info("ReminderModule initialized")
+        log.info("ReminderModule установлен")
         
         
-        if job_manager is not None:
-            self.job_manager = job_manager
+        # if job_manager is not None:
+        #     self.job_manager = job_manager
             
-            self.job_manager.create_cron_job(
-                'monday-broadcast',
-                callback=self.morning_broadcast,
-                time_data=dict(seconds=5)
-            )
+        #     self.job_manager.create_cron_job(
+        #         'monday-broadcast',
+        #         callback=self.morning_broadcast,
+        #         time_data=dict(seconds=5)
+        #     )
         
         
         

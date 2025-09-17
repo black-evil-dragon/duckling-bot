@@ -1,17 +1,14 @@
-from dotenv import dotenv_values
-
-import requests
-import logging
-
 from core.settings import config
 from core.session.decorators import try_repeat_catch
 from core.data.group import Group
 
+from utils.logger import get_logger
+from dotenv import dotenv_values
+
+import requests
 
 
-# Настройка логирования
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 

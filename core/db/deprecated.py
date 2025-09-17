@@ -6,14 +6,12 @@ import sqlite3
 
 #* Other packages ________________________________________________________________________
 from typing import Optional, Any, Dict
-
-import logging
-
+from utils.logger import get_logger
 
 
 
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+
+log = get_logger()
 
 
 

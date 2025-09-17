@@ -20,14 +20,16 @@ from . import messages
 from datetime import datetime, timedelta
 from datetime import date as DateType
 from typing import Tuple
+from utils.logger import get_logger
 
-import logging
+
 import traceback
 import requests
 
 
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+
+
+log = get_logger()
 
 
 
@@ -45,7 +47,7 @@ class ScheduleModule(BaseModule):
     
 
     def __init__(self):
-        log.info("ScheduleModule initialized")
+        log.info("ScheduleModule установлен")
 
 
     def setup(self, application: Application):

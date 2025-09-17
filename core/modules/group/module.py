@@ -17,14 +17,10 @@ from core.data.group import SUBGROUP_IDS, Group
 from core.db import Database
 
 #* Other packages ________________________________________________________________________
-import logging
+from utils.logger import get_logger
 
 
-
-
-
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 
 #* Module ________________________________________________________________________
@@ -32,7 +28,7 @@ class GroupModule(BaseModule):
     group_ids = Group.load_from_json().get('groups')
 
     def __init__(self):
-        log.info("GroupModule initialized")
+        log.info("GroupModule установлен")
 
 
     def setup(self, application: 'Application'):
