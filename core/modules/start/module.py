@@ -9,7 +9,9 @@ from telegram.ext import ContextTypes, Application
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
+from core.models.subscriber import Subscriber
 from core.models.user import User
+from core.modules.reminder.module import ReminderModule
 from core.settings.commands import CommandNames
 
 from core.modules.base import BaseMessages, BaseModule
@@ -72,6 +74,12 @@ class StartModule(BaseModule):
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
         }
+        
+        # !КОСТЫЛЬ
+        handler_map.update({
+            CommandNames.SET_REMINDER: ReminderModule.ask_reminder_time,
+            CommandNames.SHOW_REMINDER: ReminderModule.show_reminder_info,
+        })
 
         if command in handler_map:
             await handler_map[command](update, context)
@@ -161,6 +169,7 @@ class StartModule(BaseModule):
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
+        _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
 
                     
         SETTINGS_COMMANDS = (
@@ -186,12 +195,15 @@ class StartModule(BaseModule):
 
             None,
             (
-                f"settings#bool${not user_settings.get('morning_reminder', False)}$morning_reminder",
-                f"📢 Рассылка {'✅' if user_settings.get('morning_reminder', False) else '❌'}",
+                f"settings#bool${not user_settings.get('reminder', False)}$reminder",
+                f"📢 Рассылка в {user_scheduled_time_label} {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
             None,
 
-
+            None,
+            ("delegate#reminder", "Установить время"),
+            None,
+            
             None,
             ("delegate#menu", "📍 Меню"),
             None,
@@ -266,10 +278,20 @@ class StartModule(BaseModule):
         user.set_user_settings(user_settings)
 
         
-        if context.user_data.get('selected_subgroup') is None and setting == 'subgroup_lock':
+        if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
 
-
+        if setting == 'reminder':
+            subscriber: Subscriber = Subscriber.objects.get_or_create(
+                user_id=user.user_id,
+                defaults=dict(
+                    username=user.username,
+                )
+            )
+            subscriber.update(is_active=value)
+        
+        
+        
         reply_markup = StartModule.get_settings(update, context)
 
         await update_message.edit_text(

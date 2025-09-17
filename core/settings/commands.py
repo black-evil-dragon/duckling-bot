@@ -28,15 +28,24 @@ class Command:
 
 class CommandNames:
     START = "start"
-    SCHEDULE = "schedule"
+    HELP = "help"
     MENU = "menu"
-    SET_GROUP = "set_group"
-    SET_SUBGROUP = "set_subgroup"
+    SETTINGS = "settings"
+    
+    SET_GROUP = "group"
+    SET_SUBGROUP = "subgroup"
+    
+    SET_REMINDER = "reminder"
+    SHOW_REMINDER = "myreminder"
+    
+    SCHEDULE = "schedule"
     WEEK = "week"
     TODAY = "today"
     TOMORROW = "tomorrow"
-    SETTINGS = "settings"
-    HELP = "help"
+
+
+    
+    
 
 
 COMMANDS_LIST = [
@@ -46,6 +55,10 @@ COMMANDS_LIST = [
     Command(CommandNames.SET_SUBGROUP, "Установить подгруппу"),
     Command(CommandNames.WEEK, "Получить расписание на неделю"),
     Command(CommandNames.TODAY, "Получить расписание на сегодня"),
+    
+    Command(CommandNames.SET_REMINDER, "Установить напоминание"),
+    Command(CommandNames.SHOW_REMINDER, "Показать напоминание"),
+    
     Command(CommandNames.TOMORROW, "Получить расписание на завтра"),
     Command(CommandNames.SETTINGS, "Настройки бота"),
     Command(CommandNames.HELP, "Помощь"),

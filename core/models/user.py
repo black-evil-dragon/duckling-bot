@@ -1,12 +1,13 @@
 from sqlalchemy import Boolean, Column, Integer, String
+
 from db.core.models import BaseModel
+from core.models.subscriber import Subscriber
 
+from utils.logger import get_logger
 import json
-import logging
 
 
-log = logging.getLogger("duckling")
-log.setLevel(logging.DEBUG)
+log = get_logger()
 
 class User(BaseModel):
     user_id = Column(Integer, unique=True)
@@ -23,9 +24,9 @@ class User(BaseModel):
 
     def __str__(self):
         if self.last_name:
-            return f"{self.first_name} {self.last_name}"
+            return f"Пользователь {self.first_name} {self.last_name}"
         else:
-            return self.first_name
+            return f"Пользователь {self.first_name}"
         
         
     def get_selected_data(self):
@@ -39,11 +40,17 @@ class User(BaseModel):
         self.group_id = selected_group
         self.save()
         
-        
     def set_subgroup(self, selected_subgroup):
         self.subgroup_id = selected_subgroup
         self.save()
         
+
+    def get_scheduled_time_reminder(self):
+        subscriber: Subscriber = Subscriber.objects.get(user_id=self.user_id)
+        if not subscriber: return None, None
+        
+        return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
+    
 
     def get_user_settings(self):
         try:
@@ -54,7 +61,6 @@ class User(BaseModel):
         except Exception:
             log.exception('Не удалось получить настройки пользователя')
             return {}
-        
         
     def set_user_settings(self, user_settings: dict):
         self.user_settings = json.dumps(user_settings)

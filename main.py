@@ -8,8 +8,7 @@ from db.core import Database
 
 
 #* Core ________________________________________________________________________
-from core.models.user import User
-
+from core.models import User, Subscriber
 from core.settings import COMMANDS, setup_commands
 from core.session import Session
 
@@ -84,6 +83,7 @@ class Bot:
 
             # Create tables
             User.create_all()
+            Subscriber.create_all()
 
 
 

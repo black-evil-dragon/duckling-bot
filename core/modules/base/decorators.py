@@ -1,7 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from core.db import Database
 from core.models.user import User
 
 from functools import wraps
@@ -41,6 +40,7 @@ def ensure_user_settings(is_await=True, need_update=False):
                     user_settings=user_model.get_user_settings(),
                     
                     **user_model.get_selected_data(),
+                    scheduled_time=user_model.get_scheduled_time_reminder(),
                 ))
 
                 context.user_data.update({**user_data})

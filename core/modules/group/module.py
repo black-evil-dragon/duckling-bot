@@ -247,6 +247,7 @@ class GroupModule(BaseModule):
 
         elif len(groups_search) == 1:
             group_id = groups[groups_search[0]]
+            user_input = groups_search[0]
 
         elif len(groups_search) > 1:
             buttons = [[KeyboardButton(group)] for group in groups_search]
@@ -271,7 +272,7 @@ class GroupModule(BaseModule):
         user.set_group(group_id)
         
         await update.message.reply_text(
-            messages.result_choices(institute, course, group_id),
+            messages.result_choices(institute, course, user_input),
             reply_markup=ReplyKeyboardRemove()
         )
 
@@ -302,7 +303,7 @@ class GroupModule(BaseModule):
         
 
         await update.message.reply_text(
-            messages.result_subgroup_choice(selected_subgroup),
+            messages.result_subgroup_choice(user_input),
             reply_markup=ReplyKeyboardRemove()
         )
             

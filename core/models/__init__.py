@@ -1,1 +1,2 @@
-from .user import *
+from .user import User
+from .subscriber import Subscriber

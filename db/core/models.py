@@ -1,6 +1,7 @@
 #
 # * DB packages ____________________________________________
 from ast import Dict
+from enum import Enum
 from db.core import Database
 from db.core.manager import BaseManager, ManagerDescriptor
 
@@ -15,7 +16,7 @@ from sqlalchemy.ext.declarative import declared_attr
 
 
 # * Other packages ____________________________________________
-from typing import Type, TypeVar, List, Optional, Any
+from typing import Tuple, Type, TypeVar, List, Optional, Any
 import logging
 
 
@@ -51,6 +52,33 @@ class BaseModel(DeclarativeBase):
     # * |                   Class meta              
     class Meta:
         table_name: Optional[str] = None
+        
+        
+        
+    class TextChoices(str, Enum):
+        def __new__(cls, value: str, label: str):
+            obj = str.__new__(cls, value)
+            obj._value_ = value
+            obj.label = label
+            return obj
+        
+        @classmethod
+        def choices(cls) -> List[Tuple[str, str]]:
+            return [(member.value, member.label) for member in cls]
+        
+        @classmethod
+        def get_label(cls, value: str) -> str:
+            for member in cls:
+                if member.value == value:
+                    return member.label
+        
+        
+        @classmethod
+        def get_value(cls, label: str) -> str:
+            for member in cls:
+                if member.label == label:
+                    return member.value
+
 
 
 
@@ -122,9 +150,9 @@ class BaseModel(DeclarativeBase):
             session.refresh(merged_obj)
             return merged_obj
         
-    def update(self, obj_id: int, data: dict) -> Optional[T]:        
+    def update(self, **fields) -> Optional[T]:        
         with Database.session_scope() as session:
-            for key, value in data.items():
+            for key, value in dict(**fields).items():
                 setattr(self, key, value)
                 
             merged_obj = session.merge(self)
@@ -133,14 +161,6 @@ class BaseModel(DeclarativeBase):
 
             return merged_obj
 
-        with Database.session_scope() as session:
-            obj = self.model.get_by_id(obj_id, session)
-            if obj is None:
-                return None
-            
-            session.flush()
-            session.refresh(obj)
-            return obj
         
     # TRASH ----------
         

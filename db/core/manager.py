@@ -121,16 +121,30 @@ class BaseManager(Generic[T]):
             return self.model.filter_by(session, **kwargs)
 
 
+# class ManagerDescriptor:
+#     # Дескриптор для доступа к менеджеру как в Django
+#     def __init__(self, manager_class: Type[BaseManager]):
+#         self.manager_class = manager_class
+#         self.manager_instance = None
+
+#     def __get__(self, instance, owner) -> BaseManager:
+#         if instance is not None:
+#             raise AttributeError("Manager isn't accessible via instances")
+
+#         if self.manager_instance is None:
+#             self.manager_instance = self.manager_class(owner)
+#         return self.manager_instance
 class ManagerDescriptor:
-    # Дескриптор для доступа к менеджеру как в Django
-    def __init__(self, manager_class: Type[BaseManager]):
+    def __init__(self, manager_class: Type[BaseManager]) -> None:
         self.manager_class = manager_class
-        self.manager_instance = None
+        self._instances: dict = {}
+
 
     def __get__(self, instance, owner) -> BaseManager:
         if instance is not None:
-            raise AttributeError("Manager isn't accessible via instances")
-
-        if self.manager_instance is None:
-            self.manager_instance = self.manager_class(owner)
-        return self.manager_instance
+            raise AttributeError("Manager доступен только через класс, не через экземпляр")
+        
+        if owner not in self._instances:
+            self._instances[owner] = self.manager_class(owner)
+        
+        return self._instances[owner]

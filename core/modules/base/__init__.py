@@ -2,11 +2,12 @@
 
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import Update
+from telegram import InlineKeyboardButton, Update
 from telegram.ext import Application, ContextTypes
 
 
 #* Core ________________________________________________________________________
+from core.modules.base.decorators import ensure_user_settings
 from core.settings import COMMANDS
 
 
@@ -31,6 +32,7 @@ class BaseMessages:
 
 # * MODULE ___________________________________________________________________
 class BaseModule:
+
     def __init__(self) -> None:
         pass
     
@@ -66,6 +68,18 @@ class BaseModule:
             
             return wrapper
         return decorator
+    
+    @staticmethod
+    @ensure_user_settings(need_update=True)
+    async def update_user_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        return
+        
+    
+    menu_button = InlineKeyboardButton("📍 Меню", callback_data="delegate#menu")
+
+    @staticmethod
+    def delegate_button_template(text, command):
+        return InlineKeyboardButton(text=text, callback_data=f"delegate#{command}")
     # * |___________________________________________________________|
 
 
@@ -81,7 +95,7 @@ class BaseModule:
 
     # * ____________________________________________________________
     # * |               Message handlers                            |
-    # ...
+    
     # * |___________________________________________________________|
 
 
