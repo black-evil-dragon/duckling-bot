@@ -1,5 +1,5 @@
 # * Telegram bot framework ________________________________________________________________________
-import json
+from typing import List
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
@@ -13,8 +13,12 @@ from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_user_settings
 from core.modules.reminder import messages
 from core.settings.commands import CommandNames
+
 from utils.logger import get_logger
 from utils.scheduler import JobManager
+
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 
 log = get_logger()
@@ -35,15 +39,18 @@ class ReminderModule(BaseModule):
 
         self.job_manager = application.bot_data.get("job_manager", None)
         
+        job_queue = application.job_queue
         for task_name, time in Subscriber.cron_data.items():
-            self.job_manager.create_cron_job(
-                task_name,
-                callback=self.morning_broadcast,
-                job_type="cron",
-                time_data=dict(
-                    **time,
-                    day_of_week="mon-sat"
-                ),
+            job_queue.run_custom(
+                name=task_name,
+                callback=self.schedule_broadcast,
+                job_kwargs=dict(
+                    trigger=IntervalTrigger(**dict(
+                        # **time,
+                        seconds=5,
+                        # day_of_week="mon-sat",
+                    ))
+                )
             )
 
     # * ____________________________________________________________
@@ -113,7 +120,7 @@ class ReminderModule(BaseModule):
 
 
         subscriber: Subscriber = Subscriber.objects.get_or_create(
-            user_id=user.user_id,
+            user=user.id,
             defaults=dict(
                 username=user.username,
             )
@@ -135,7 +142,15 @@ class ReminderModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                       Logic                               |
-    def morning_broadcast(self):
-        log.info("Morning broadcast !!!!!!!!!!")
+    async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
+        subscriber_list: List[Subscriber] = Subscriber.objects.filter(is_active=True)
+        # print(123)
+        return
+        
+        for subscriber in subscriber_list:
+            user: User = subscriber.user
+            print(user)
+            pass
+            
 
     # * |___________________________________________________________|

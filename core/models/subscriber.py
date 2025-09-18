@@ -1,6 +1,6 @@
-from sqlalchemy import Boolean, Column, Integer, String
-from db.core.models import BaseModel
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 
+from db.core.models import BaseModel
 
 
 class Subscriber(BaseModel):
@@ -29,12 +29,14 @@ class Subscriber(BaseModel):
         
         DAY_14_30 = 'day-14-30', '14:30'
 
-        
-    user_id = Column(Integer, unique=True)
-    username = Column(String, default='')
     is_active = Column(Boolean, default=False)
+        
+    user = Column(Integer, ForeignKey('users.id'))
+    username = Column(String, default='')
     
-    scheduled_time = Column(String, default=TimeChoices.get_value('morning-7-40'))
+    group_id = Column(String, default='')
+    scheduled_time = Column(String, default='TimeChoices.get_value()')
+    
     
     def __str__(self):
         return f"Подписчик: {self.username}"

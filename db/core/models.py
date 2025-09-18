@@ -62,6 +62,9 @@ class BaseModel(DeclarativeBase):
             obj.label = label
             return obj
         
+        def __get__(self, isinstance, owner):
+            pass
+        
         @classmethod
         def choices(cls) -> List[Tuple[str, str]]:
             return [(member.value, member.label) for member in cls]

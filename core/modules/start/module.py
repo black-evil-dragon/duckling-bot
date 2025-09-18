@@ -196,7 +196,7 @@ class StartModule(BaseModule):
             None,
             (
                 f"settings#bool${not user_settings.get('reminder', False)}$reminder",
-                f"📢 Рассылка в {user_scheduled_time_label} {'✅' if user_settings.get('reminder', False) else '❌'}",
+                f"📢 Рассылка в {user_scheduled_time_label or '07:40'} {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
             None,
 
@@ -283,7 +283,7 @@ class StartModule(BaseModule):
 
         if setting == 'reminder':
             subscriber: Subscriber = Subscriber.objects.get_or_create(
-                user_id=user.user_id,
+                user=user.id,
                 defaults=dict(
                     username=user.username,
                 )

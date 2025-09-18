@@ -1,7 +1,7 @@
 from sqlalchemy import Boolean, Column, Integer, String
 
-from db.core.models import BaseModel
 from core.models.subscriber import Subscriber
+from db.core.models import BaseModel
 
 from utils.logger import get_logger
 import json
@@ -46,7 +46,7 @@ class User(BaseModel):
         
 
     def get_scheduled_time_reminder(self):
-        subscriber: Subscriber = Subscriber.objects.get(user_id=self.user_id)
+        subscriber: Subscriber = Subscriber.objects.get(user=self.user_id)
         if not subscriber: return None, None
         
         return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
