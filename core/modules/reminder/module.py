@@ -15,7 +15,6 @@ from core.modules.reminder import messages
 from core.settings.commands import CommandNames
 
 from utils.logger import get_logger
-from utils.scheduler import JobManager
 
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -26,8 +25,6 @@ log = get_logger()
 
 class ReminderModule(BaseModule):
     jobs = {}
-
-    job_manager: "JobManager" = None
     
     
 
@@ -37,7 +34,6 @@ class ReminderModule(BaseModule):
         
         application.add_handler(CallbackQueryHandler(self.set_reminder_time, pattern="^set_reminder_time#"))
 
-        self.job_manager = application.bot_data.get("job_manager", None)
         
         job_queue = application.job_queue
         for task_name, time in Subscriber.cron_data.items():
