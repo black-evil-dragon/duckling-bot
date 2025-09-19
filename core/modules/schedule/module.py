@@ -85,28 +85,32 @@ class ScheduleModule(BaseModule):
     
     @staticmethod
     def get_schedule_query(
-        user_data: dict,
-        date, date_end = None,
+        group_id: int = None,
+        user_data: dict = None,
+        date_start: str = datetime.today().strftime("%Y-%m-%d"),
+        date_end: str = None,
         additional: dict = None
     ):  
+        if user_data is None:
+            user_data = {}
+
         user_settings: dict = user_data.get('user_settings', {})
-        group_id = str(user_data.get('selected_group', None))
         
         params = dict(
-            group_id=group_id,
+            group_id=str(user_data.get('selected_group', None) or group_id),
             selected_lesson_type="typical",
         )
          
        
         if date_end is not None:
             params.update(dict(
-                date_start=date,
+                date_start=date_start,
                 date_end=date_end,
             ))
             
         else:
             params.update(dict(
-                date=date,
+                date=date_start,
             ))
         
         
@@ -116,7 +120,7 @@ class ScheduleModule(BaseModule):
             ))
             
 
-        if additional:
+        if additional is not None:
             params.update(**additional)
         
 
@@ -156,6 +160,32 @@ class ScheduleModule(BaseModule):
 
         return prev_date, next_date
 
+    
+    
+    @classmethod
+    def get_schedule_by_group_id(
+        cls,
+        group_id: int,
+        date_start: "str" = datetime.today().strftime("%Y-%m-%d"),
+        date_end: "str" = None,
+        additional: dict = None
+    ) -> dict:
+        data = dict(
+            group_id=group_id,
+            date_start=date_start,
+            date_end=date_end,
+        )
+    
+        if additional is not None:
+            data.update(**additional.get('user_data', {}))
+
+        params = cls.get_schedule_query(**data)
+        
+        
+        print('data', data)
+        print('params', params)
+        
+        return
     # * |___________________________________________________________|
 
 
@@ -224,10 +254,8 @@ class ScheduleModule(BaseModule):
             
             response_data: dict = ScheduleModule.fetch_data(**request)
 
-
             context.user_data['schedule_day_data'] = dict(
                 **prepare_schedule_day_data(response_data.get("data", {})),
-                last_update=response_data.get("last_update", ""),
             )
 
 
@@ -292,7 +320,6 @@ class ScheduleModule(BaseModule):
             schedule = dict(
                 group=response_data.get("group", ""),
                 data=prepare_schedule_weeks_data(response_data.get("data", {})),
-                last_update=response_data.get("last_update", ""),
             )
             context.user_data['schedule_weeks_data'] = schedule
             
@@ -395,7 +422,6 @@ class ScheduleModule(BaseModule):
         context.user_data.update(dict(
             schedule_day_data=dict(
                 **prepare_schedule_day_data(response_data.get("data", {})),
-                last_update=response_data.get("last_update", ""),
             )
         ))
         

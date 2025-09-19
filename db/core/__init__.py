@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker, Session, scoped_session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session, declarative_base, DeclarativeBase
 
 from contextlib import contextmanager
 from typing import Generator
@@ -34,6 +34,9 @@ class Database:
                     expire_on_commit=expire_on_commit,
                 )
             )
+            
+            Base: "DeclarativeBase" = declarative_base()
+            Base.metadata.create_all(cls._engine)
 
             log.debug(f"+ Инициализировано подключение к базе данных: {url}")
 

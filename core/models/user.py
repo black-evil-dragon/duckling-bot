@@ -1,7 +1,9 @@
 from sqlalchemy import Boolean, Column, Integer, String
+from db.core import models
+
 
 from core.models.subscriber import Subscriber
-from db.core.models import BaseModel
+
 
 from utils.logger import get_logger
 import json
@@ -9,7 +11,7 @@ import json
 
 log = get_logger()
 
-class User(BaseModel):
+class User(models.BaseModel):
     user_id = Column(Integer, unique=True)
 
     is_bot = Column(Boolean, default=False)
@@ -21,6 +23,7 @@ class User(BaseModel):
     group_id = Column(Integer, default=None)
     subgroup_id = Column(Integer, default=None)
     user_settings = Column(String, default=None)
+    
 
     def __str__(self):
         if self.last_name:
@@ -29,13 +32,33 @@ class User(BaseModel):
             return f"Пользователь {self.first_name}"
         
         
+    # * SERIALIZE DATA 
+    def get_user_data(self):
+        user_data = dict(
+            user_id=self.user_id,
+            first_name=self.first_name,
+            last_name=self.last_name,
+            username=self.username,
+            
+            **self.get_selected_data(),
+            user_settings=self.get_user_settings(),
+            
+            scheduled_time=self.get_scheduled_time_reminder(),
+            
+            user_model=self,
+        )
+        
+        return user_data    
+
     def get_selected_data(self):
         return dict(
             selected_institute=self.group_id,
             selected_group=self.group_id,
             selected_subgroup=self.subgroup_id,
         )
-        
+    
+    
+    # * GROUP MANAGEMENT  
     def set_group(self, selected_group):
         self.group_id = selected_group
         self.save()
@@ -44,14 +67,16 @@ class User(BaseModel):
         self.subgroup_id = selected_subgroup
         self.save()
         
-
+    
+    # * REMINDER
     def get_scheduled_time_reminder(self):
-        subscriber: Subscriber = Subscriber.objects.get(user=self.user_id)
+        subscriber: Subscriber = Subscriber.objects.get(user=self)
         if not subscriber: return None, None
         
         return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
+  
     
-
+    # * SETTINGS MANAGEMENT
     def get_user_settings(self):
         try:
             if not self.user_settings:

@@ -7,6 +7,7 @@ from telegram.ext import Application, ContextTypes
 
 
 #* Core ________________________________________________________________________
+from core.models.user import User
 from core.modules.base.decorators import ensure_user_settings
 from core.settings import COMMANDS
 
@@ -73,8 +74,9 @@ class BaseModule:
     @ensure_user_settings(need_update=True)
     async def update_user_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
-        
     
+    
+    # * Buttons
     menu_button = InlineKeyboardButton("📍 Меню", callback_data="delegate#menu")
 
     @staticmethod

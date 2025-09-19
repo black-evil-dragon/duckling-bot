@@ -2,6 +2,7 @@
 # * DB packages ____________________________________________
 from . import Database
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import not_
 
 from db.types.models import BaseModelType
 
@@ -118,7 +119,39 @@ class BaseManager(Generic[T]):
         session: Optional["Session" | None]
 
         with Database.session_scope() as session:
-            return self.model.filter_by(session, **kwargs)
+            query = session.query(self.model)
+            
+            for key, value in kwargs.items():
+                if key.endswith('__exclude'):
+                    # Исключение
+                    actual_key = key.replace('__exclude', '', 1)
+                    query = query.filter(not_(getattr(self.model, actual_key)))
+                    
+                elif key.endswith('__gt'):
+                    # Больше чем
+                    actual_key = key.replace('__gt', '', 1)
+                    query = query.filter(getattr(self.model, actual_key) > value)
+                    
+                elif key.endswith('__lt'):
+                    # Меньше чем
+                    actual_key = key.replace('__lt', '', 1)
+                    query = query.filter(getattr(self.model, actual_key) < value)
+                    
+                elif key.endswith('__in'):
+                    # В списке
+                    actual_key = key.replace('__in', '', 1)
+                    query = query.filter(getattr(self.model, actual_key).in_(value))
+                    
+                elif key.endswith('__not_in'):
+                    # Не в списке
+                    actual_key = key.replace('__not_in', '', 1)
+                    query = query.filter(getattr(self.model, actual_key).notin_(value))
+                    
+                else:
+                    # Обычное равенство
+                    query = query.filter(getattr(self.model, key) == value)
+                    
+                return query.all()
 
 
 # class ManagerDescriptor:

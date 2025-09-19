@@ -1,7 +1,5 @@
 #
 # * DB packages ____________________________________________
-from ast import Dict
-from enum import Enum
 from db.core import Database
 from db.core.manager import BaseManager, ManagerDescriptor
 
@@ -16,7 +14,7 @@ from sqlalchemy.ext.declarative import declared_attr
 
 
 # * Other packages ____________________________________________
-from typing import Tuple, Type, TypeVar, List, Optional, Any
+from typing import Type, TypeVar, List, Optional, Any
 import logging
 
 
@@ -45,42 +43,10 @@ class BaseModel(DeclarativeBase):
     
     
 
-
-
-
     # * _______________________________________________________
-    # * |                   Class meta              
+    # * |                   Classes              
     class Meta:
         table_name: Optional[str] = None
-        
-        
-        
-    class TextChoices(str, Enum):
-        def __new__(cls, value: str, label: str):
-            obj = str.__new__(cls, value)
-            obj._value_ = value
-            obj.label = label
-            return obj
-        
-        def __get__(self, isinstance, owner):
-            pass
-        
-        @classmethod
-        def choices(cls) -> List[Tuple[str, str]]:
-            return [(member.value, member.label) for member in cls]
-        
-        @classmethod
-        def get_label(cls, value: str) -> str:
-            for member in cls:
-                if member.value == value:
-                    return member.label
-        
-        
-        @classmethod
-        def get_value(cls, label: str) -> str:
-            for member in cls:
-                if member.label == label:
-                    return member.value
 
 
 

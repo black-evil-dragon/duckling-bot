@@ -283,9 +283,9 @@ class StartModule(BaseModule):
 
         if setting == 'reminder':
             subscriber: Subscriber = Subscriber.objects.get_or_create(
-                user=user.id,
+                user_id=user.id,
                 defaults=dict(
-                    username=user.username,
+                    user=user,
                 )
             )
             subscriber.update(is_active=value)

@@ -12,8 +12,10 @@ from core.modules.base import BaseModule
 # * Other packages ________________________________________________________________________
 from core.modules.base.decorators import ensure_user_settings
 from core.modules.reminder import messages
+from core.modules.schedule.module import ScheduleModule
 from core.settings.commands import CommandNames
 
+from db.core import Database
 from utils.logger import get_logger
 
 from apscheduler.triggers.cron import CronTrigger
@@ -55,7 +57,7 @@ class ReminderModule(BaseModule):
     @ensure_user_settings()
     async def show_reminder_info(cls, update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
         update_message = update.message or update.callback_query.message
-        time_value, time_label = context.user_data.get("scheduled_time")
+        _, time_label = context.user_data.get("scheduled_time")
 
         message = messages.user_scheduled_reminder_template(time_label)
 
@@ -138,15 +140,16 @@ class ReminderModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                       Logic                               |
+
+    
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
-        subscriber_list: List[Subscriber] = Subscriber.objects.filter(is_active=True)
-        # print(123)
-        return
+        subscriber_list = Subscriber.get_active_subscribers()
         
-        for subscriber in subscriber_list:
-            user: User = subscriber.user
-            print(user)
-            pass
-            
+        group_ids = set(sub.user.group_id for sub in subscriber_list)
+        
+        group_id = list(group_ids)[0]
+        
+        ScheduleModule.get_schedule_by_group_id(group_id)
+        
 
     # * |___________________________________________________________|

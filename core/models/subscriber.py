@@ -1,9 +1,18 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship, joinedload
 
-from db.core.models import BaseModel
+
+from db.core import Database, models
 
 
-class Subscriber(BaseModel):
+from typing import List
+
+
+
+class Subscriber(models.BaseModel):
+    class Meta:
+        table_name = 'subscribers'
+
     cron_data = {
         "morning-7-40": dict(
             hour=7,
@@ -22,7 +31,9 @@ class Subscriber(BaseModel):
             minute=30
         )
     }
-    class TimeChoices(BaseModel.TextChoices):
+    
+
+    class TimeChoices(models.TextChoices):
         MORNING_7_40 = 'morning-7-40', '7:40'
         MORNING_9_20 = 'morning-9-20', '9:20'
         MORNING_11_20 = 'morning-11-20', '11:20'
@@ -31,17 +42,26 @@ class Subscriber(BaseModel):
 
     is_active = Column(Boolean, default=False)
         
-    user = Column(Integer, ForeignKey('users.id'))
-    username = Column(String, default='')
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User', backref=f'{Meta.table_name}')
     
-    group_id = Column(String, default='')
-    scheduled_time = Column(String, default='TimeChoices.get_value()')
+    scheduled_time = Column(String, default=f'{TimeChoices.MORNING_7_40}')
     
     
     def __str__(self):
-        return f"Подписчик: {self.username}"
+        return f"Подписчик: {self.user_id}"
     
     
     def set_scheduled_time(self, time):
         self.scheduled_time = time
         self.save()
+        
+    @classmethod
+    def get_active_subscribers(cls) -> List['Subscriber']:
+        subscribers = []
+        
+        with Database.session_scope() as session:
+            joined_table = session.query(cls).options(joinedload(cls.user))
+            subscribers = [subscriber for subscriber in joined_table.filter(cls.is_active) if subscriber.user and subscriber.user.group_id]
+
+        return subscribers
