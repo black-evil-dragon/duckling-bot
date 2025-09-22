@@ -17,6 +17,8 @@ from functools import wraps
 from typing import Callable
 
 
+strf_time_mask = "%Y-%m-%d"
+
 
 
 class BaseMessages:
@@ -45,6 +47,8 @@ class BaseModule:
 
     def setup(self, application: 'Application') -> None:
         raise Exception('Функция не переопределена')
+
+    
     
     
     # * ____________________________________________________________

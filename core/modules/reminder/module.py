@@ -1,5 +1,6 @@
 # * Telegram bot framework ________________________________________________________________________
 from typing import List
+import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
@@ -65,6 +66,9 @@ class ReminderModule(BaseModule):
             message,
             reply_markup=InlineKeyboardMarkup([[cls.delegate_button_template(messages.choose_reminder_time_button, f"delegate#{CommandNames.SET_REMINDER}")]])
         )
+        
+        
+
 
 
     @classmethod
@@ -72,23 +76,50 @@ class ReminderModule(BaseModule):
     async def ask_reminder_time(cls, update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
         update_message = update.message or update.callback_query.message
         choices = Subscriber.TimeChoices.choices()
+        user_settings: dict = context.user_data.get('user_settings', {})
+        
+    
+        def get_actual_markup(user_settings: dict):
+            keyboard = []
+            count_in_row = 2
+    
+            for i in range(0, len(choices), count_in_row):
+                row = []
 
-        keyboard = []
-        count_in_row = 2
+                if i == 0:
+                    keyboard += [[InlineKeyboardButton(
+                        text=f"Получать расписание на сегодня {'✅' if user_settings.get('reminder_today', True) else '❌'}",
+                        callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
+                    )]]
+                elif i % 4 == 0 and i != 0:
+                    keyboard += [[InlineKeyboardButton(
+                        text=f"Получать расписание на завтра {'✅' if not user_settings.get('reminder_today', True) else '❌'}",
+                        callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
+                    )]]
 
-        for i in range(0, len(choices), count_in_row):
-            row = []
-            for time_value, time_label in choices[i:i+count_in_row]:
-                row.append(InlineKeyboardButton(
-                    text=f"{time_label}",
-                    callback_data=f"set_reminder_time#{time_value}",
-                ))
-            keyboard += [row]
+                for time_value, time_label in choices[i:i+count_in_row]:
+                    row.append(InlineKeyboardButton(
+                        text=f"{time_label}",
+                        callback_data=f"set_reminder_time#{time_value}",
+                    ))
+
+                keyboard += [row]
+            return InlineKeyboardMarkup(keyboard)
             
+        text = messages.ask_reminder_time
+        reply_markup = get_actual_markup(user_settings)
+        
+        # !КОСТЫЛЬ
+        context.user_data.update(dict(
+            send_settings=False,
+            settings_text=text,
+            get_actual_markup=get_actual_markup,
+        ))
+
     
         await update_message.reply_text(
-            messages.ask_reminder_time,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            text=text,
+            reply_markup=reply_markup,
         )
     # * |___________________________________________________________|
 
@@ -118,13 +149,21 @@ class ReminderModule(BaseModule):
 
 
         subscriber: Subscriber = Subscriber.objects.get_or_create(
-            user=user.id,
+            user_id=user.id,
             defaults=dict(
                 username=user.username,
             )
         )
         subscriber.set_scheduled_time(time_value)
         await self.update_user_settings(update, context)
+        
+        
+        # !КОСТЫЛЬ
+        context.user_data.update(dict(
+            send_settings=True,
+            settings_text=None,
+            get_actual_markup=None,
+        ))
     
     
         await update_message.edit_text(
@@ -143,13 +182,29 @@ class ReminderModule(BaseModule):
 
     
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
+        session: 'requests.Session' = context.bot_data.get('session')
+        if not session: return
+    
         subscriber_list = Subscriber.get_active_subscribers()
-        
         group_ids = set(sub.user.group_id for sub in subscriber_list)
         
-        group_id = list(group_ids)[0]
+        if not group_ids: return
         
-        ScheduleModule.get_schedule_by_group_id(group_id)
+        
+        # group_id = list(group_ids)[0]
+        
+        # print(context.bot_data.get('session'))
+        
+        # response: dict = ScheduleModule.get_schedule_by_group_id(
+        #     session=session,
+        #     group_id=group_id
+        # )
+        
+        # message = ScheduleModule.get_message_schedule(response, is_daily=True)
+        
+        # print(message)
+        
+        
         
 
     # * |___________________________________________________________|

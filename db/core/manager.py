@@ -1,7 +1,7 @@
 #
 # * DB packages ____________________________________________
 from . import Database
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, RelationshipProperty
 from sqlalchemy.sql import not_
 
 from db.types.models import BaseModelType
@@ -63,13 +63,19 @@ class BaseManager(Generic[T]):
         
     def get_or_create(self, defaults: Optional[Dict[str, Any]] = None, **filters) -> "T":
         """Получить объект по фильтрам или создать новый с defaults."""
-
         defaults = defaults or {}
 
         with Database.session_scope() as session:
             query = session.query(self.model)
             for field, value in filters.items():
-                query = query.filter(getattr(self.model, field) == value)
+                # Проверяем, является ли поле relationship
+                if hasattr(getattr(self.model, field), 'property') and isinstance(getattr(self.model, field).property, RelationshipProperty):
+                    # Для relationship используем специальную обработку
+                    query = query.filter(getattr(self.model, field) == value)
+                else:
+                    # Для обычных полей
+                    query = query.filter(getattr(self.model, field) == value)
+            
             instance = query.first()
 
             if instance:
@@ -81,6 +87,38 @@ class BaseManager(Generic[T]):
             session.flush()
             session.refresh(instance)
             return instance
+        
+        
+    def update_or_create(self, defaults: Optional[Dict[str, Any]] = None, **filters) -> "T":
+        """Обновить объект по фильтрам или создать новый с defaults."""
+        defaults = defaults or {}
+
+        with Database.session_scope() as session:
+            query = session.query(self.model)
+            for field, value in filters.items():
+                # Проверяем, является ли поле relationship
+                if hasattr(getattr(self.model, field), 'property') and isinstance(getattr(self.model, field).property, RelationshipProperty):
+                    query = query.filter(getattr(self.model, field) == value)
+                else:
+                    query = query.filter(getattr(self.model, field) == value)
+            
+            instance = query.first()
+
+            if instance:
+                # Обновляем существующий объект
+                for key, value in defaults.items():
+                    setattr(instance, key, value)
+                session.flush()
+                session.refresh(instance)
+                return instance
+            else:
+                # Создаем новый объект
+                params = {**filters, **defaults}
+                instance = self.model(**params)
+                session.add(instance)
+                session.flush()
+                session.refresh(instance)
+                return instance
 
     def all(self) -> List[T]:
         """Получить все объекты."""

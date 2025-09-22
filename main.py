@@ -15,7 +15,7 @@ from core.session import Session
 
 #* Other packages ________________________________________________________________________
 from utils.logger import setup_logger
-# from utils.scheduler import JobManager
+
 
 from dotenv import load_dotenv
 
@@ -30,8 +30,6 @@ import logging
 class Bot:
 
     session_manager: 'Session' = None
-    # job_manager: 'JobManager' = None
-
 
 
     def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = 'db.sqlite3'):
@@ -45,10 +43,6 @@ class Bot:
             key=api_key,  
         )
         self.app.bot_data.update({'session': self.session_manager})
-
-        # * Job manager
-        # self.job_manager = JobManager()
-        # self.app.bot_data.update({'job_manager': self.job_manager})
         
 
         # * Database
@@ -58,7 +52,7 @@ class Bot:
 
     async def post_init(self, application):
         await setup_commands(application, COMMANDS)
-        # self.job_manager.start()
+
             
 
     # * ____________________________________________________________

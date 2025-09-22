@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
 #* Core ________________________________________________________________________
-from core.modules.base import BaseModule
+from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings
 from core.modules.group.module import GroupModule
 
@@ -19,7 +19,7 @@ from . import messages
 #* Other packages ________________________________________________________________________
 from datetime import datetime, timedelta
 from datetime import date as DateType
-from typing import Optional, Tuple
+from typing import Tuple
 from utils.logger import get_logger
 
 
@@ -87,7 +87,7 @@ class ScheduleModule(BaseModule):
     def get_schedule_query(
         group_id: int = None,
         user_data: dict = None,
-        date_start: str = datetime.today().strftime("%Y-%m-%d"),
+        date_start: str = datetime.today().strftime(strf_time_mask),
         date_end: str = None,
         additional: dict = None
     ):  
@@ -155,8 +155,8 @@ class ScheduleModule(BaseModule):
             next_date = current_day + timedelta(days=2)
         
         if strftime:
-            prev_date = prev_date.strftime("%Y-%m-%d")
-            next_date = next_date.strftime("%Y-%m-%d")
+            prev_date = prev_date.strftime(strf_time_mask)
+            next_date = next_date.strftime(strf_time_mask)
 
         return prev_date, next_date
 
@@ -165,8 +165,9 @@ class ScheduleModule(BaseModule):
     @classmethod
     def get_schedule_by_group_id(
         cls,
+        session: 'requests.Session',
         group_id: int,
-        date_start: "str" = datetime.today().strftime("%Y-%m-%d"),
+        date_start: "str" = datetime.today().strftime(strf_time_mask),
         date_end: "str" = None,
         additional: dict = None
     ) -> dict:
@@ -179,13 +180,52 @@ class ScheduleModule(BaseModule):
         if additional is not None:
             data.update(**additional.get('user_data', {}))
 
-        params = cls.get_schedule_query(**data)
+        request = dict(
+            session=session,
+            path="schedule/day/",
+            params=cls.get_schedule_query(**data),
+        )
+        
+        response_data: dict = ScheduleModule.fetch_data(**request)
+
+        return response_data
+    
+    
+    @classmethod
+    def get_message_schedule(cls, data: dict, is_daily: bool = True, date: "DateType" = datetime.today()) -> dict:
+        formatter = None
+        serializer = None
         
         
-        print('data', data)
-        print('params', params)
+        if is_daily:
+            formatter = prepare_schedule_day_data
+            serializer = messages.format_schedule_day
+        else:
+            formatter = prepare_schedule_weeks_data
+            serializer = messages.format_schedule_weeks
+            
+
+        prepare_data = formatter(data.get("data", {}))
+        message = serializer(prepare_data)
         
-        return
+        prev_key, next_key = cls.get_prev_next_day(date, strftime=True)
+         
+        callback_data = 'schedule_day' if is_daily else 'schedule_week'
+        entity = 'День' if is_daily else 'Неделя'
+        
+        
+        return dict(
+            text=message,
+            parse_mode='HTML',
+            reply_markup=messages.use_paginator(
+                callback_data=callback_data,
+                entity=entity,
+                prev_key=prev_key,
+                next_key=next_key,
+
+                additional_buttons=[messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}')]
+            )
+        )
     # * |___________________________________________________________|
 
 
@@ -240,7 +280,7 @@ class ScheduleModule(BaseModule):
                 today += timedelta(days=1)
                 context.user_data.update(dict(need_tomorrow=False))
                 
-            today_string = today.strftime("%Y-%m-%d")
+            today_string = today.strftime(strf_time_mask)
     
     
             request = dict(
@@ -309,8 +349,8 @@ class ScheduleModule(BaseModule):
                 path="schedule/weeks/",
                 params=ScheduleModule.get_schedule_query(
                     context.user_data,
-                    date=today.strftime("%Y-%m-%d"),
-                    date_end=(today + timedelta(weeks=3)).strftime("%Y-%m-%d"),
+                    date=today.strftime(strf_time_mask),
+                    date_end=(today + timedelta(weeks=3)).strftime(strf_time_mask),
                 )
             )
             

@@ -14,19 +14,19 @@ class Subscriber(models.BaseModel):
         table_name = 'subscribers'
 
     cron_data = {
-        "morning-7-40": dict(
+        "today-7-40": dict(
             hour=7,
             minute=40
         ),
-        "morning-9-20": dict(
+        "today-9-20": dict(
             hour=9,
             minute=20
         ),
-        "morning-11-20": dict(
+        "today-11-20": dict(
             hour=11,
             minute=20
         ),
-        "day-14-30": dict(
+        "today-14-30": dict(
             hour=14,
             minute=30
         )
@@ -34,18 +34,25 @@ class Subscriber(models.BaseModel):
     
 
     class TimeChoices(models.TextChoices):
-        MORNING_7_40 = 'morning-7-40', '7:40'
-        MORNING_9_20 = 'morning-9-20', '9:20'
-        MORNING_11_20 = 'morning-11-20', '11:20'
+        TODAY_7_40 = 'today-7-40', 'На сегодня в 7:40'
+        TODAY_9_20 = 'today-9-20', 'На сегодня в 9:20'
+        TODAY_11_20 = 'today-11-20', 'На сегодня в 11:20'
+        TODAY_14_30 = 'today-14-30', 'На сегодня в 14:30'
         
-        DAY_14_30 = 'day-14-30', '14:30'
+        # TOMORROW_7_40 = 'tomorrow-7-40', 'На завтра в 7:40'
+        # TOMORROW_9_20 = 'tomorrow-9-20', 'На завтра в 9:20'
+        TOMORROW_11_20 = 'tomorrow-11-20', 'На завтра в 11:20'
+        TOMORROW_14_30 = 'tomorrow-14-30', 'На завтра в 14:30'
+        TOMORROW_17_00 = 'tomorrow-17-00', 'На завтра в 17:00'
+        TOMORROW_19_30 = 'tomorrow-19-30', 'На завтра в 19:30'
+        
 
     is_active = Column(Boolean, default=False)
         
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship('User', backref=f'{Meta.table_name}')
     
-    scheduled_time = Column(String, default=f'{TimeChoices.MORNING_7_40}')
+    scheduled_time = Column(String, default=f'{TimeChoices.TODAY_7_40}')
     
     
     def __str__(self):

@@ -8,6 +8,8 @@ from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram.ext import ContextTypes, Application
 from telegram.ext import filters
 
+from telegram.error import BadRequest
+
 #* Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
 from core.models.user import User
@@ -196,7 +198,7 @@ class StartModule(BaseModule):
             None,
             (
                 f"settings#bool${not user_settings.get('reminder', False)}$reminder",
-                f"📢 Рассылка в {user_scheduled_time_label or '07:40'} {'✅' if user_settings.get('reminder', False) else '❌'}",
+                f"📢 Рассылка {user_scheduled_time_label.lower() or '07:40'} {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
             None,
 
@@ -219,6 +221,12 @@ class StartModule(BaseModule):
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
+        
+        context.user_data.update(dict(
+            send_settings=True,
+            settings_text=None,
+            get_actual_markup=None
+        ))
 
         await update_message.reply_text(
             messages.settings_text,
@@ -277,28 +285,39 @@ class StartModule(BaseModule):
 
         user.set_user_settings(user_settings)
 
-        
+
+        # !КОСТЫЛЬ
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
 
         if setting == 'reminder':
-            subscriber: Subscriber = Subscriber.objects.get_or_create(
+            subscriber: Subscriber = Subscriber.objects.update_or_create(
                 user_id=user.id,
                 defaults=dict(
-                    user=user,
+                    is_active=value,
                 )
             )
-            subscriber.update(is_active=value)
-        
         
         
         reply_markup = StartModule.get_settings(update, context)
-
-        await update_message.edit_text(
-            messages.settings_text,
-            parse_mode='HTML',
-            reply_markup=reply_markup
-        )
+        text = messages.settings_text
+        
+        
+        # !КОСТЫЛЬ
+        if not context.user_data.get('send_settings', True):
+            get_actual_markup = context.user_data.get('get_actual_markup')
+            reply_markup = get_actual_markup(user_settings)
+            text = context.user_data.get('settings_text')
+        
+    
+        try:
+            await update_message.edit_text(
+                text=text,
+                parse_mode='HTML',
+                reply_markup=reply_markup
+            )
+        except BadRequest:
+            log.error('Ошибка при редактировании сообщения, возможно, сообщение не изменено.')
 
     # ...
     # * |___________________________________________________________|
