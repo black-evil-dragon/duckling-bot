@@ -2,15 +2,38 @@ from telegram import BotCommand
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application
 
+from db.core.models.enums import TextChoices
+
 from typing import List, Tuple
 
+class CommandNames(TextChoices):
+    START = "start", "Запуск"
+    HELP = "help", "Помощь"
+    MENU = "menu", "Меню"
+    SETTINGS = "settings", "Настройки"
+    
+    SET_GROUP = "group", "Установить группу"
+    SET_SUBGROUP = "subgroup", "Установить подгруппу"
+    
+    SET_REMINDER = "reminder", "Настройки рассылки"
+    SHOW_REMINDER = "myreminder", "Показать мою рассылкуы"
+    
+    SCHEDULE = "schedule", "Расписание"
+    WEEK = "week", "Расписание на неделю"
+    TODAY = "today", "Расписание на сегодня"
+    TOMORROW = "tomorrow", "Расписание на завтра"
+    
 
 class Command:
     name = ""
     description = ""
 
-    def __init__(self, name, description):
+    def __init__(self, name, description = None):
         self.name = name
+        
+        if description is None:
+            description = CommandNames.get_label(name)
+
         self.description = description
 
     def get_data(self):
@@ -26,42 +49,21 @@ class Command:
         return self.description
 
 
-class CommandNames:
-    START = "start"
-    HELP = "help"
-    MENU = "menu"
-    SETTINGS = "settings"
-    
-    SET_GROUP = "group"
-    SET_SUBGROUP = "subgroup"
-    
-    SET_REMINDER = "reminder"
-    SHOW_REMINDER = "myreminder"
-    
-    SCHEDULE = "schedule"
-    WEEK = "week"
-    TODAY = "today"
-    TOMORROW = "tomorrow"
-
-
-    
-    
-
 
 COMMANDS_LIST = [
     Command(CommandNames.SCHEDULE, "Расписание (в зависимости от выбора)"),
-    Command(CommandNames.MENU, "Меню"),
-    Command(CommandNames.SET_GROUP, "Установить группу"),
-    Command(CommandNames.SET_SUBGROUP, "Установить подгруппу"),
-    Command(CommandNames.WEEK, "Получить расписание на неделю"),
-    Command(CommandNames.TODAY, "Получить расписание на сегодня"),
+    Command(CommandNames.MENU),
+    Command(CommandNames.SET_GROUP),
+    Command(CommandNames.SET_SUBGROUP),
+    Command(CommandNames.WEEK),
+    Command(CommandNames.TODAY),
     
-    Command(CommandNames.SET_REMINDER, "Установить напоминание"),
-    Command(CommandNames.SHOW_REMINDER, "Показать напоминание"),
+    Command(CommandNames.SET_REMINDER),
+    Command(CommandNames.SHOW_REMINDER),
     
-    Command(CommandNames.TOMORROW, "Получить расписание на завтра"),
-    Command(CommandNames.SETTINGS, "Настройки бота"),
-    Command(CommandNames.HELP, "Помощь"),
+    Command(CommandNames.TOMORROW),
+    Command(CommandNames.SETTINGS),
+    Command(CommandNames.HELP),
 ]
 
 #! Deprecated

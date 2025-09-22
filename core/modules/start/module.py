@@ -1,5 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
+from types import FunctionType
 from telegram import Update
 from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
@@ -203,11 +204,11 @@ class StartModule(BaseModule):
             None,
 
             None,
-            ("delegate#reminder", "Установить время"),
+            (f"delegate#{CommandNames.SET_REMINDER}", "Настройки рассылки"),
             None,
             
             None,
-            ("delegate#menu", "📍 Меню"),
+            (f"delegate#{CommandNames.MENU}", "📍 Меню"),
             None,
         )
 
@@ -222,8 +223,11 @@ class StartModule(BaseModule):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
         
+        # ? Что это такое???
+        # Это прикол, который позволяет отправлять 
+        # свой markup с text через контекст
         context.user_data.update(dict(
-            send_settings=True,
+            send_custom_settings=False,
             settings_text=None,
             get_actual_markup=None
         ))
@@ -269,55 +273,69 @@ class StartModule(BaseModule):
         user: User = context.user_data.get('user_model')
         user_settings: dict = context.user_data.get('user_settings', {})
         
-        
+        # * Определение настройки
         command = query.data.split('#')[-1]
         value_type, value, setting = command.split('$')
         
-
-        if value_type == 'bool':
-            value = True if value == 'True' else False
-
-        
-        user_settings.update({
-            setting: value
-        })
+        # * Обновление данных
+        user_settings = user.set_setting(setting, value, value_type)
 
 
-        user.set_user_settings(user_settings)
-
-
+        # * Особенности поведения
         # !КОСТЫЛЬ
+        # В теории, это надо вынести в отдельный метод
+        # Тогда здесь можно было бы написать типо
+        # | if callback_checker is not None:
+        # |     callback_checker(command_info)
+        # 
+        # Upd: Что я и сделал
+        
+        # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
 
-        if setting == 'reminder':
-            subscriber: Subscriber = Subscriber.objects.update_or_create(
-                user_id=user.id,
-                defaults=dict(
-                    is_active=value,
-                )
-            )
+        # if callback is not None:
+        #     callback(
+        #         setting=dict(
+        #             name=setting,
+        #             value=value,
+        #             _type=value_type,
+        #         ),
+        #         context=context
+        #     )
+            
+            # subscriber: Subscriber = Subscriber.objects.update_or_create(
+            #     user_id=user.id,
+            #     defaults=dict(
+            #         is_active=value,
+            #     )
+            # )
+            
         
         
+        
+        # !КОСТЫЛЬ.. Наверное
+        # См метод send_settings
+        # * Надстройка для отправки своего markup и text
         reply_markup = StartModule.get_settings(update, context)
         text = messages.settings_text
         
-        
-        # !КОСТЫЛЬ
-        if not context.user_data.get('send_settings', True):
+        if context.user_data.get('send_custom_settings', True):
             get_actual_markup = context.user_data.get('get_actual_markup')
             reply_markup = get_actual_markup(user_settings)
             text = context.user_data.get('settings_text')
         
     
+        # * Отправка сообщения
         try:
             await update_message.edit_text(
                 text=text,
                 parse_mode='HTML',
                 reply_markup=reply_markup
             )
+
         except BadRequest:
             log.error('Ошибка при редактировании сообщения, возможно, сообщение не изменено.')
+            return
 
-    # ...
     # * |___________________________________________________________|

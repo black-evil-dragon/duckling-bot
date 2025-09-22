@@ -1,3 +1,4 @@
+from typing import Any
 from sqlalchemy import Boolean, Column, Integer, String
 from db.core import models
 
@@ -70,10 +71,11 @@ class User(models.BaseModel):
     
     # * REMINDER
     def get_scheduled_time_reminder(self):
-        subscriber: Subscriber = Subscriber.objects.get(user=self)
-        if not subscriber: return None, None
+        # subscriber: Subscriber = Subscriber.objects.get(user=self)
+        # if not subscriber: return None, None
         
-        return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
+        # return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
+        pass
   
     
     # * SETTINGS MANAGEMENT
@@ -90,5 +92,26 @@ class User(models.BaseModel):
     def set_user_settings(self, user_settings: dict):
         self.user_settings = json.dumps(user_settings)
         self.save()
+        
+        
+    def set_setting(self, setting: str, value: Any, value_type: str = 'default') -> dict:
+        _value_type = str
+        
+        types = {
+            'bool': bool,
+            'int': int,
+            'str': str,
+            'default': str
+        }
+        _value_type = types[value_type]
+        
+        _value = _value_type(value)
+        
+        settings = self.get_user_settings()
+        settings.update({setting: _value})
+        
+        self.set_user_settings(settings)
+        
+        return settings
         
         

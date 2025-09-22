@@ -24,24 +24,17 @@ def ensure_user_settings(is_await=True, need_update=False):
                 user = update.effective_user
 
                 user_data = {}
-                user_model: User = User.objects.get_or_create(user_id=user.id, defaults=dict(
+                user_model: User = User.objects.update_or_create(user_id=user.id, defaults=dict(
                     is_bot=user.is_bot,
                     first_name=user.first_name,
                     last_name=user.last_name,
                     username=user.username,
                 ))
                 
-                # user_data = user_model.to_dict()
                 
                 user_data.update(dict(
                     is_user_loaded=True,
-                    
                     **user_model.get_user_data(),
-                    # user_model=user_model,
-                    # user_settings=user_model.get_user_settings(),
-                    
-                    # **user_model.get_selected_data(),
-                    # scheduled_time=user_model.get_scheduled_time_reminder(),
                 ))
 
                 context.user_data.update({**user_data})

@@ -1,50 +1,21 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, joinedload
-
 
 from db.core import Database, models
 
-
 from typing import List
-
+import datetime
 
 
 class Subscriber(models.BaseModel):
     class Meta:
         table_name = 'subscribers'
 
-    cron_data = {
-        "today-7-40": dict(
-            hour=7,
-            minute=40
-        ),
-        "today-9-20": dict(
-            hour=9,
-            minute=20
-        ),
-        "today-11-20": dict(
-            hour=11,
-            minute=20
-        ),
-        "today-14-30": dict(
-            hour=14,
-            minute=30
-        )
-    }
     
-
-    class TimeChoices(models.TextChoices):
-        TODAY_7_40 = 'today-7-40', 'На сегодня в 7:40'
-        TODAY_9_20 = 'today-9-20', 'На сегодня в 9:20'
-        TODAY_11_20 = 'today-11-20', 'На сегодня в 11:20'
-        TODAY_14_30 = 'today-14-30', 'На сегодня в 14:30'
-        
-        # TOMORROW_7_40 = 'tomorrow-7-40', 'На завтра в 7:40'
-        # TOMORROW_9_20 = 'tomorrow-9-20', 'На завтра в 9:20'
-        TOMORROW_11_20 = 'tomorrow-11-20', 'На завтра в 11:20'
-        TOMORROW_14_30 = 'tomorrow-14-30', 'На завтра в 14:30'
-        TOMORROW_17_00 = 'tomorrow-17-00', 'На завтра в 17:00'
-        TOMORROW_19_30 = 'tomorrow-19-30', 'На завтра в 19:30'
+    class ScheduleTypes(models.TextChoices):
+        FOR_TODAY = 'today', 'На сегодня'
+        FOR_TOMORROW = 'tomorrow', 'На завтра'
+    
         
 
     is_active = Column(Boolean, default=False)
@@ -52,14 +23,15 @@ class Subscriber(models.BaseModel):
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship('User', backref=f'{Meta.table_name}')
     
-    scheduled_time = Column(String, default=f'{TimeChoices.TODAY_7_40}')
+    schedule_type = Column(String, default=f'{ScheduleTypes.FOR_TODAY}')
+    schedule_time = Column(DateTime, default=None)
     
     
     def __str__(self):
         return f"Подписчик: {self.user_id}"
     
     
-    def set_scheduled_time(self, time):
+    def set_scheduled_time(self, time: 'datetime.datetime'):
         self.scheduled_time = time
         self.save()
         

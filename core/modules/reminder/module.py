@@ -75,45 +75,45 @@ class ReminderModule(BaseModule):
     @ensure_user_settings()
     async def ask_reminder_time(cls, update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
         update_message = update.message or update.callback_query.message
-        choices = Subscriber.TimeChoices.choices()
-        user_settings: dict = context.user_data.get('user_settings', {})
+        # choices = Subscriber.TimeChoices.choices()
+        # user_settings: dict = context.user_data.get('user_settings', {})
         
     
-        def get_actual_markup(user_settings: dict):
-            keyboard = []
-            count_in_row = 2
+        # def get_actual_markup(user_settings: dict):
+        #     keyboard = []
+        #     count_in_row = 2
     
-            for i in range(0, len(choices), count_in_row):
-                row = []
+        #     for i in range(0, len(choices), count_in_row):
+        #         row = []
 
-                if i == 0:
-                    keyboard += [[InlineKeyboardButton(
-                        text=f"Получать расписание на сегодня {'✅' if user_settings.get('reminder_today', True) else '❌'}",
-                        callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
-                    )]]
-                elif i % 4 == 0 and i != 0:
-                    keyboard += [[InlineKeyboardButton(
-                        text=f"Получать расписание на завтра {'✅' if not user_settings.get('reminder_today', True) else '❌'}",
-                        callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
-                    )]]
+        #         if i == 0:
+        #             keyboard += [[InlineKeyboardButton(
+        #                 text=f"Получать расписание на сегодня {'✅' if user_settings.get('reminder_today', True) else '❌'}",
+        #                 callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
+        #             )]]
+        #         elif i % 4 == 0 and i != 0:
+        #             keyboard += [[InlineKeyboardButton(
+        #                 text=f"Получать расписание на завтра {'✅' if not user_settings.get('reminder_today', True) else '❌'}",
+        #                 callback_data=f"settings#bool${not user_settings.get('reminder_today', True)}$reminder_today"
+        #             )]]
 
-                for time_value, time_label in choices[i:i+count_in_row]:
-                    row.append(InlineKeyboardButton(
-                        text=f"{time_label}",
-                        callback_data=f"set_reminder_time#{time_value}",
-                    ))
+        #         for time_value, time_label in choices[i:i+count_in_row]:
+        #             row.append(InlineKeyboardButton(
+        #                 text=f"{time_label}",
+        #                 callback_data=f"set_reminder_time#{time_value}",
+        #             ))
 
-                keyboard += [row]
-            return InlineKeyboardMarkup(keyboard)
+        #         keyboard += [row]
+        #     return InlineKeyboardMarkup(keyboard)
             
         text = messages.ask_reminder_time
-        reply_markup = get_actual_markup(user_settings)
+        reply_markup = None # get_actual_markup(user_settings)
         
         # !КОСТЫЛЬ
         context.user_data.update(dict(
             send_settings=False,
             settings_text=text,
-            get_actual_markup=get_actual_markup,
+            # get_actual_markup=get_actual_markup,
         ))
 
     
@@ -150,20 +150,17 @@ class ReminderModule(BaseModule):
 
         subscriber: Subscriber = Subscriber.objects.get_or_create(
             user_id=user.id,
-            defaults=dict(
-                username=user.username,
-            )
         )
         subscriber.set_scheduled_time(time_value)
         await self.update_user_settings(update, context)
         
         
         # !КОСТЫЛЬ
-        context.user_data.update(dict(
-            send_settings=True,
-            settings_text=None,
-            get_actual_markup=None,
-        ))
+        # context.user_data.update(dict(
+        #     send_settings=True,
+        #     settings_text=None,
+        #     get_actual_markup=None,
+        # ))
     
     
         await update_message.edit_text(
