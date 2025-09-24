@@ -1,5 +1,6 @@
 
 # * Telegram bot framework ________________________________________________________________________
+import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update
 
 from telegram.ext import ContextTypes, Application
@@ -32,8 +33,13 @@ log = get_logger()
 
 
 class ReminderModule(BaseModule):
-    jobs = {}
+    user_jobs = {}
+    _instance: "ReminderModule" = None
     
+    def __init__(self):
+        self.user_jobs = {}
+        self.__class__._instance = self
+        self.user_jobs['1'] = 1
 
     def setup(self, application: "Application"):
         application.add_handler(CommandHandler(CommandNames.SHOW_REMINDER, self.show_reminder_info))
@@ -43,12 +49,14 @@ class ReminderModule(BaseModule):
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_time_input),
             group=3
         )
+        
+        # application.create_task(self.restore_reminders(application))
 
         
         # job_queue = application.job_queue
         # job_queue.run_custom(
-        #     name="schedule-reminder-broadcast",
-        #     callback=self.schedule_broadcast,
+        #     name="reminder-getter",
+        #     callback=self.get_subscribers_stack,
         #     job_kwargs=dict(
         #         trigger=IntervalTrigger(**dict(
         #             # **time,
@@ -57,8 +65,17 @@ class ReminderModule(BaseModule):
         #         ))
         #     )
         # )
-        self.start_hybrid_scheduler(application)
-        
+        # job_queue.run_custom(
+        #     name="reminder-sender",
+        #     callback=self.schedule_broadcast,
+        #     job_kwargs=dict(
+        #         trigger=IntervalTrigger(**dict(
+        #             # **time,
+        #             seconds=10,
+        #             # day_of_week="mon-sat",
+        #         ))
+        #     )
+        # )
         
     # * ____________________________________________________________
     # * |               Helpers                                     |
@@ -67,11 +84,11 @@ class ReminderModule(BaseModule):
         return InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(
-                    text=f"Расписание на сегодня {'✅' if settings.get('reminder_today', True) else '❌'}",
+                    text=f"На сегодня {'✅' if settings.get('reminder_today', True) else '❌'}",
                     callback_data=f"settings#bool${not settings.get('reminder_today', True)}$reminder_today"
                 ),
                 InlineKeyboardButton(
-                    text=f"Расписание на завтра {'✅' if not settings.get('reminder_today', True) else '❌'}",
+                    text=f"На завтра {'✅' if not settings.get('reminder_today', True) else '❌'}",
                     callback_data=f"settings#bool${not settings.get('reminder_today', True)}$reminder_today"
                 ), 
             ],
@@ -156,12 +173,14 @@ class ReminderModule(BaseModule):
         user: User = context.user_data.get('user_model')
         user_settings = user.get_user_settings()
         
-        Subscriber.objects.update_or_create(
+        subscriber: "Subscriber" = Subscriber.objects.update_or_create(
             user_id=user.id,
             defaults=dict(
                 schedule_time=time,
             )
         )
+        
+        await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False))
         
         
         # * Return
@@ -176,56 +195,61 @@ class ReminderModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                       Logic                               |
-    async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
-        session: 'requests.Session' = context.bot_data.get('session')
-        if not session: return
+    @classmethod
+    async def sign_subscriber(cls, subscriber: "Subscriber", is_sign: bool):
+        if cls._instance is None:
+            raise RuntimeError("ReminderModule not initialized")
         
+        instance: 'ReminderModule' = cls._instance
         
+        log.info(instance.user_jobs)
+        
+        if is_sign:
+            # reminder_time = subscriber.schedule_time
+            # await instance.set_reminder_for_user(
+            #     subscriber, reminder_time, cls._instance.application
+            # )
+            pass
+        else:
+            # await instance.stop_reminder_for_user(
+            #     user_id, cls._instance.application
+            # )
+            pass
+        
+        await asyncio.sleep(1)
         
     
+    
+    async def restore_reminders(self, application: "Application"):
+        """Восстанавливаем напоминания из БД при старте бота"""
+        await 1
+        return
+        reminders = Subscriber.get_active_subscribers()
         
+        for user_id, reminder_time in reminders:
+            await self.set_reminder_for_user(user_id, reminder_time, application)
+            
+    
+    
+    async def set_reminder_for_user(self, subscriber: Subscriber, reminder_time: datetime.time, application: "Application"):
+        # Останавливаем предыдущее напоминание если есть
+        user_id = subscriber.user_id
+        user_data: dict = subscriber.user.get_user_data()
+        await self.stop_reminder_for_user(subscriber.user_id, application)
         
-    @classmethod
-    def start_hybrid_scheduler(cls, application: "Application"):
-        """Гибридный подход: проверка каждые 5 минут + точное время"""
-        job_queue = application.job_queue
+        # Создаем уникальное имя задачи
+        job_name = f"reminder_{subscriber.user_id}"
         
-        # Базовая проверка каждые 5 минут (для надежности)
-        job_queue.run_repeating(
-            callback=cls.schedule_broadcast,
-            interval=300,  # 5 минут
-            name="schedule-broadcast-5min"
+        # Добавляем задачу в планировщик
+        job = application.job_queue.run_daily(
+            callback=self.send_schedule_to_user,
+            time=reminder_time,
+            days=tuple(range(7)),
+            data=dict(**user_data),
+            name=job_name
         )
         
-        # Точные проверки по расписанию
-        cls.schedule_precise_checks(job_queue)
-    
-    @classmethod
-    def schedule_precise_checks(cls, job_queue: "JobQueue"):
-        """Планирует точные проверки по времени подписчиков"""
-        unique_times: List['Subscriber'] = Subscriber.get_subscriber_by_unique_times()
-        
-        for subscriber in unique_times:
-            if subscriber.schedule_time:
-                cls.create_daily_job(job_queue, subscriber.schedule_time)
-    
-    @classmethod
-    def create_daily_job(cls, job_queue: "JobQueue", schedule_time: datetime.time):
-        """Создает ежедневную job на определенное время"""
-        now = datetime.datetime.now()
-        target_datetime = datetime.datetime.combine(now.date(), schedule_time)
-
-
-        if target_datetime <= now:
-            target_datetime += datetime.timedelta(days=1)
-        
-
-        job_queue.run_daily(
-            callback=cls.schedule_broadcast,
-            time=schedule_time,
-            name=f"daily-schedule-{schedule_time.strftime('%H-%M')}",
-            days=tuple(range(7))
-        )
-        
+        # Сохраняем ссылку на задачу
+        self.user_jobs[user_id] = job
 
     # * |___________________________________________________________|

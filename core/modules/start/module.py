@@ -288,11 +288,15 @@ class StartModule(BaseModule):
             await GroupModule.ask_subgroup(update, context)
         
         if setting == 'reminder':
-            Subscriber.objects.update_or_create(
-                user_id=user.id, defaults=dict(
+            subscriber: "Subscriber" = Subscriber.objects.update_or_create(
+                user_id=user.user_id, defaults=dict(
                     is_active=user_settings.get('reminder', False)
                 )
             )
+            if subscriber.schedule_time is None:
+                await ReminderModule.ask_reminder_time(update, context)
+            else:
+                await ReminderModule.sign_subscriber(user.id, user_settings.get('reminder', False))
         
         
         

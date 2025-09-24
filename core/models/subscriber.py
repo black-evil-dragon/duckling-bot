@@ -41,17 +41,13 @@ class Subscriber(models.BaseModel):
     
     
     @classmethod
-    def get_active_subscribers(cls) -> List['Subscriber']:
-        subscribers = []
-        
+    def get_active_subscribers(cls) -> List['Subscriber']:        
         with Database.session_scope() as session:
             joined_table = session.query(cls).options(joinedload(cls.user))
-            subscribers = [subscriber for subscriber in joined_table.filter(cls.is_active) if subscriber.user and subscriber.user.group_id]
-
-        return subscribers
+            return [subscriber for subscriber in joined_table.filter(cls.is_active) if subscriber.user and subscriber.user.group_id]
     
     
     @classmethod
-    def get_subscriber_by_unique_times(cls) -> List['Subscriber']:
+    def get_subscriber_by_unique_times(cls, times: list) -> List['Subscriber']:
         with Database.session_scope() as session:
-            return session.query(cls).filter(cls.is_active).distinct(cls.schedule_time).all()
+            pass
