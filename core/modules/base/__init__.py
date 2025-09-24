@@ -52,35 +52,21 @@ class BaseModule:
     
     
     # * ____________________________________________________________
-    # * |               Decorators and utils                         |
-    @staticmethod
-    def set_command_process(is_run: bool, context: 'ContextTypes.DEFAULT_TYPE'):
-        context.user_data.update(dict(
-            is_command_process=is_run
-        ))
-        return context
-    
+    # * |                       Utils                               |
 
+    # ? Well
     @staticmethod
-    def command_process(is_run: bool):
-        def decorator(func: Callable) -> Callable:
-            @wraps(func)
-            async def wrapper(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', **kwargs):
-
-                context = BaseModule.set_command_process(is_run, context)
-                
-                return await func(update, context, **kwargs)
-            
-            return wrapper
-        return decorator
+    @ensure_user_settings()
+    async def update_user_settings(*args, **kwargs):
+        pass
     
-    @staticmethod
-    @ensure_user_settings(need_update=True)
-    async def update_user_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        return
+    # * |___________________________________________________________|
     
     
-    # * Buttons
+    
+    # * ____________________________________________________________
+    # * |                        UI                                 |
+    # * | Buttons
     menu_button = InlineKeyboardButton("📍 Меню", callback_data="delegate#menu")
 
     @staticmethod
@@ -89,7 +75,7 @@ class BaseModule:
     # * |___________________________________________________________|
 
 
-    
+    # COMMENT TEMPLATES
     
 
     # * ____________________________________________________________

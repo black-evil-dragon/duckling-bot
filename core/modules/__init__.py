@@ -21,8 +21,8 @@ def setup_modules(application: 'Application'):
     modules: List[BaseModule] = [
         ScheduleModule(),
         GroupModule(),
-        StartModule(),
         ReminderModule(),
+        StartModule(),
     ]
 
     for module in modules:

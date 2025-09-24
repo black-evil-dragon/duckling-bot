@@ -44,7 +44,7 @@ class User(models.BaseModel):
             **self.get_selected_data(),
             user_settings=self.get_user_settings(),
             
-            scheduled_time=self.get_scheduled_time_reminder(),
+            # scheduled_time=self.get_scheduled_time_reminder(),
             
             user_model=self,
         )
@@ -52,8 +52,9 @@ class User(models.BaseModel):
         return user_data    
 
     def get_selected_data(self):
+        # В целом сломалось все из-за этого,
+        # Люблю, что я это сделал.
         return dict(
-            selected_institute=self.group_id,
             selected_group=self.group_id,
             selected_subgroup=self.subgroup_id,
         )
@@ -98,13 +99,12 @@ class User(models.BaseModel):
         _value_type = str
         
         types = {
-            'bool': bool,
+            'bool': lambda v: v == 'True',
             'int': int,
             'str': str,
             'default': str
         }
         _value_type = types[value_type]
-        
         _value = _value_type(value)
         
         settings = self.get_user_settings()

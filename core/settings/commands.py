@@ -15,8 +15,8 @@ class CommandNames(TextChoices):
     SET_GROUP = "group", "Установить группу"
     SET_SUBGROUP = "subgroup", "Установить подгруппу"
     
-    SET_REMINDER = "reminder", "Настройки рассылки"
-    SHOW_REMINDER = "myreminder", "Показать мою рассылкуы"
+    SET_REMINDER = "reminder", "Установить время рассылки"
+    SHOW_REMINDER = "myreminder", "Моя рассылка"
     
     SCHEDULE = "schedule", "Расписание"
     WEEK = "week", "Расписание на неделю"
@@ -37,7 +37,7 @@ class Command:
         self.description = description
 
     def get_data(self):
-        return (self.name, self.description)
+        return (self.get_name(), self.get_description())
 
     def get_name(self):
         return self.name
@@ -46,7 +46,8 @@ class Command:
         return f"/{self.name}"
 
     def get_description(self):
-        return self.description
+        # print(CommandNames.get_label(self.name))
+        return self.description or CommandNames.get_label(self.name)
 
 
 
@@ -66,6 +67,7 @@ COMMANDS_LIST = [
     Command(CommandNames.HELP),
 ]
 
+
 #! Deprecated
 COMMANDS = [command.get_data() for command in COMMANDS_LIST]
 
@@ -84,6 +86,4 @@ def create_command_keyboard(commands: list[tuple[str, str]]) -> ReplyKeyboardMar
 async def setup_commands(application: "Application", commands: List[Tuple[str, str]]):
     application.bot_data["command_keyboard"] = create_command_keyboard(commands)
 
-    await application.bot.set_my_commands(
-        [BotCommand(command, description) for command, description in commands]
-    )
+    await application.bot.set_my_commands([BotCommand(command, description) for command, description in commands])

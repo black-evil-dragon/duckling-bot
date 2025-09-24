@@ -287,8 +287,8 @@ class ScheduleModule(BaseModule):
                 session=session,
                 path="schedule/day/",
                 params=ScheduleModule.get_schedule_query(
-                    context.user_data,
-                    date=today_string,
+                    user_data=context.user_data,
+                    date_start=today_string,
                 )
             )
             
@@ -348,8 +348,8 @@ class ScheduleModule(BaseModule):
                 session=session,
                 path="schedule/weeks/",
                 params=ScheduleModule.get_schedule_query(
-                    context.user_data,
-                    date=today.strftime(strf_time_mask),
+                    user_data=context.user_data,
+                    date_start=today.strftime(strf_time_mask),
                     date_end=(today + timedelta(weeks=3)).strftime(strf_time_mask),
                 )
             )
@@ -446,8 +446,8 @@ class ScheduleModule(BaseModule):
             session=session,
             path="schedule/day/",
             params=ScheduleModule.get_schedule_query(
-                context.user_data,
-                date=query_date_string,
+                user_data=context.user_data,
+                date_start=query_date_string,
             )
         )
             

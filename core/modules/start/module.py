@@ -43,7 +43,7 @@ class StartModule(BaseModule):
     def setup(self, application: 'Application') -> None:
         application.add_handler(MessageHandler(
             filters.ALL, 
-            self.load_user_settings
+            self.update_user_settings
         ), group=-1)
 
         application.add_handler(MessageHandler(
@@ -83,6 +83,7 @@ class StartModule(BaseModule):
             CommandNames.SET_REMINDER: ReminderModule.ask_reminder_time,
             CommandNames.SHOW_REMINDER: ReminderModule.show_reminder_info,
         })
+        
 
         if command in handler_map:
             await handler_map[command](update, context)
@@ -172,7 +173,7 @@ class StartModule(BaseModule):
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
-        _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
+        # _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
 
                     
         SETTINGS_COMMANDS = (
@@ -199,13 +200,13 @@ class StartModule(BaseModule):
             None,
             (
                 f"settings#bool${not user_settings.get('reminder', False)}$reminder",
-                f"📢 Рассылка {user_scheduled_time_label.lower() or '07:40'} {'✅' if user_settings.get('reminder', False) else '❌'}",
+                f"📢 Рассылка {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
             None,
 
             None,
-            (f"delegate#{CommandNames.SET_REMINDER}", "Настройки рассылки"),
-            None,
+            (f"delegate#{CommandNames.SET_REMINDER}", CommandNames.SET_REMINDER.label),
+            (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
             
             None,
             (f"delegate#{CommandNames.MENU}", "📍 Меню"),
@@ -248,14 +249,6 @@ class StartModule(BaseModule):
         if not context.user_data.get('is_command_process', False):
             await self.show_command_keyboard(update, context)
 
-
-    @staticmethod
-    @ensure_user_settings()
-    async def load_user_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if context.user_data.get('is_user_loaded', False): return
-
-
-
     # * |___________________________________________________________|
 
 
@@ -279,6 +272,8 @@ class StartModule(BaseModule):
         
         # * Обновление данных
         user_settings = user.set_setting(setting, value, value_type)
+        context.user_data.update(dict(user_settings=user_settings))
+
 
 
         # * Особенности поведения
@@ -287,30 +282,17 @@ class StartModule(BaseModule):
         # Тогда здесь можно было бы написать типо
         # | if callback_checker is not None:
         # |     callback_checker(command_info)
-        # 
-        # Upd: Что я и сделал
-        
+
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
-
-        # if callback is not None:
-        #     callback(
-        #         setting=dict(
-        #             name=setting,
-        #             value=value,
-        #             _type=value_type,
-        #         ),
-        #         context=context
-        #     )
-            
-            # subscriber: Subscriber = Subscriber.objects.update_or_create(
-            #     user_id=user.id,
-            #     defaults=dict(
-            #         is_active=value,
-            #     )
-            # )
-            
+        
+        if setting == 'reminder':
+            Subscriber.objects.update_or_create(
+                user_id=user.id, defaults=dict(
+                    is_active=user_settings.get('reminder', False)
+                )
+            )
         
         
         
@@ -320,10 +302,13 @@ class StartModule(BaseModule):
         reply_markup = StartModule.get_settings(update, context)
         text = messages.settings_text
         
-        if context.user_data.get('send_custom_settings', True):
-            get_actual_markup = context.user_data.get('get_actual_markup')
-            reply_markup = get_actual_markup(user_settings)
-            text = context.user_data.get('settings_text')
+        if context.user_data.get('send_custom_settings', False):
+            get_custom_markup = context.user_data.get('get_custom_markup')
+            
+            if get_custom_markup:
+                reply_markup = get_custom_markup(user_settings)
+            
+            text = context.user_data.get('custom_settings_text', messages.settings_text)
         
     
         # * Отправка сообщения
@@ -336,6 +321,7 @@ class StartModule(BaseModule):
 
         except BadRequest:
             log.error('Ошибка при редактировании сообщения, возможно, сообщение не изменено.')
+            # log.debug('Текст ошибки:', exc_info=True)
             return
 
     # * |___________________________________________________________|
