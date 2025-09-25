@@ -1,10 +1,9 @@
 
 # * Telegram bot framework ________________________________________________________________________
-import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update
 
 from telegram.ext import ContextTypes, Application
-from telegram.ext import CommandHandler, MessageHandler, JobQueue
+from telegram.ext import CommandHandler, MessageHandler, JobQueue, Job
 from telegram.ext import filters
 
 # * Core ________________________________________________________________________
@@ -17,29 +16,36 @@ from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch
 from core.modules.reminder import messages
 
+from core.modules.schedule.module import ScheduleModule
 from core.settings.commands import CommandNames
 from utils.logger import get_logger
 
 
-from typing import List, Set
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
-
-import requests
+from typing import Dict, Tuple
+import pytz
 import datetime
+import asyncio
+import requests
 
 log = get_logger()
 
 
 
 class ReminderModule(BaseModule):
-    user_jobs = {}
-    _instance: "ReminderModule" = None
+    content_cache: Dict[Tuple["datetime.date", int], str] = {}
+    cache_lock = asyncio.Lock()
+    
+    user_jobs: Dict[str, "Job"] = {}
+    
+    application: "Application" = None
+    instance: "ReminderModule" = None
+    
+    
+    session: "requests.Session" = None
     
     def __init__(self):
         self.user_jobs = {}
-        self.__class__._instance = self
-        self.user_jobs['1'] = 1
+        self.__class__.instance = self
 
     def setup(self, application: "Application"):
         application.add_handler(CommandHandler(CommandNames.SHOW_REMINDER, self.show_reminder_info))
@@ -50,35 +56,16 @@ class ReminderModule(BaseModule):
             group=3
         )
         
-        # application.create_task(self.restore_reminders(application))
-
+        self.__class__.application = application
+        self.session = application.bot_data.get('session')
         
-        # job_queue = application.job_queue
-        # job_queue.run_custom(
-        #     name="reminder-getter",
-        #     callback=self.get_subscribers_stack,
-        #     job_kwargs=dict(
-        #         trigger=IntervalTrigger(**dict(
-        #             # **time,
-        #             seconds=5,
-        #             # day_of_week="mon-sat",
-        #         ))
-        #     )
-        # )
-        # job_queue.run_custom(
-        #     name="reminder-sender",
-        #     callback=self.schedule_broadcast,
-        #     job_kwargs=dict(
-        #         trigger=IntervalTrigger(**dict(
-        #             # **time,
-        #             seconds=10,
-        #             # day_of_week="mon-sat",
-        #         ))
-        #     )
-        # )
+        application.job_queue.run_once(self.restore_reminders, when=2)
         
     # * ____________________________________________________________
     # * |               Helpers                                     |
+    def get_job_name(self, user_id: int):
+        return f"reminder_{user_id}"
+    
     @classmethod
     def get_reminder_markup(cls, settings: dict):
         return InlineKeyboardMarkup([
@@ -195,61 +182,150 @@ class ReminderModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                       Logic                               |
+    
+    # * | broadcast ________________________________________________|
+    async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
+        # {'user_id': 959259687, 'first_name': 'BlackEvilDragon', 'last_name': None, 'username': 'blackevil_dragon', 'selected_group': 233, 'selected_subgroup': 3, 'user_settings': {'reminder': True}, 'user_model': <User: Пользователь BlackEvilDragon>}
+        
+        user_data: dict = context.job.data
+        user_id = user_data.get('user_id')
+        selected_group = user_data.get('selected_group')
+        current_date = datetime.datetime.now().date()
+        
+        await asyncio.sleep(0.1)
+        
+
+
+        
+        
+    async def get_cached_content(self, current_date: "datetime.date", group_id: int, user_data: dict) -> str:
+        cache_key = (current_date, group_id)
+        
+        # Проверяем кеш
+        async with self.cache_lock:
+            if cache_key in self.content_cache:
+                log.debug(f"Используем кешированный контент для группы {group_id} на {current_date}")
+                return self.content_cache[cache_key]
+        
+        # Генерируем новый контент
+        content = await self.generate_broadcast_content(current_date, group_id, user_data)
+        
+        # Сохраняем в кеш
+        if content:
+            async with self.cache_lock:
+                self.content_cache[cache_key] = content
+                log.debug(f"Сгенерирован и закеширован контент для группы {group_id} на {current_date}")
+        
+        return content
+        
+        
+
+    async def generate_broadcast_content(self, current_date: "datetime.date", group_id: int, user_data: dict) -> str:   
+        args = dict( 
+            session=self.session,
+            group_id=group_id,
+            additional={}
+        )
+        
+        if user_data.get('user_settings'):
+            user_settings: dict = user_data.get('user_settings', {})
+            
+
+            if not user_settings.get('reminder_today', True):
+                args.update(dict(
+                    date=current_date + datetime.timedelta(days=1),
+                ))
+
+            args["additional"].update(dict(
+                user_settings=user_settings
+            ))
+        
+        
+        response: dict = ScheduleModule.get_schedule_by_group_id(**args)
+        
+        message = ScheduleModule.get_message_schedule(response, is_daily=True)
+        
+        print(message)
+        await asyncio.sleep(0.1)
+    
+
+    # * | sign_subscriber __________________________________________|
+    # ? | Подписываем пользователя на интервальное событие
+    # ? | или отписываем
     @classmethod
-    async def sign_subscriber(cls, subscriber: "Subscriber", is_sign: bool):
-        if cls._instance is None:
+    async def sign_subscriber(cls, subscriber: "Subscriber", is_sign: bool, user: "User" = None):
+        if cls.instance is None:
             raise RuntimeError("ReminderModule not initialized")
         
-        instance: 'ReminderModule' = cls._instance
+        instance: 'ReminderModule' = cls.instance
+        reminder_time = subscriber.schedule_time
         
-        log.info(instance.user_jobs)
+        if not is_sign:
+            await instance.stop_reminder_for_user(subscriber)   
+            return
+
+        if not reminder_time:
+            await cls.ask_reminder_time()
+            return
         
-        if is_sign:
-            # reminder_time = subscriber.schedule_time
-            # await instance.set_reminder_for_user(
-            #     subscriber, reminder_time, cls._instance.application
-            # )
-            pass
-        else:
-            # await instance.stop_reminder_for_user(
-            #     user_id, cls._instance.application
-            # )
-            pass
+        await instance.set_reminder_for_user(subscriber, reminder_time, user)
         
-        await asyncio.sleep(1)
-        
+
     
+
     
-    async def restore_reminders(self, application: "Application"):
-        """Восстанавливаем напоминания из БД при старте бота"""
-        await 1
-        return
-        reminders = Subscriber.get_active_subscribers()
+    # * | Set reminder _____________________________________________|
+    # ? | Ставим джобу
+    async def set_reminder_for_user(self, subscriber: "Subscriber", reminder_time: "datetime.time", user: "User" = None):
+        user: "User" = subscriber.get_user() if user is None else user
+
+        user_id = user.id
+        user_data: dict = user.get_user_data()
         
-        for user_id, reminder_time in reminders:
-            await self.set_reminder_for_user(user_id, reminder_time, application)
-            
+        # Останавливаем предыдущее напоминание, если есть
+        await self.stop_reminder_for_user(subscriber)
+        
+        msk_tz = pytz.timezone('Europe/Moscow')
+        utc_tz = pytz.timezone('UTC')
+        now_msk = datetime.datetime.now(msk_tz)
+        
+        msk_datetime  = msk_tz.localize(datetime.datetime.combine(now_msk.date(), reminder_time))
+        utc_datetime = msk_datetime.astimezone(utc_tz)
     
-    
-    async def set_reminder_for_user(self, subscriber: Subscriber, reminder_time: datetime.time, application: "Application"):
-        # Останавливаем предыдущее напоминание если есть
-        user_id = subscriber.user_id
-        user_data: dict = subscriber.user.get_user_data()
-        await self.stop_reminder_for_user(subscriber.user_id, application)
-        
-        # Создаем уникальное имя задачи
-        job_name = f"reminder_{subscriber.user_id}"
-        
-        # Добавляем задачу в планировщик
-        job = application.job_queue.run_daily(
-            callback=self.send_schedule_to_user,
-            time=reminder_time,
+        job = self.application.job_queue.run_daily(
+            callback=self.schedule_broadcast,
+            time=utc_datetime,
             days=tuple(range(7)),
             data=dict(**user_data),
-            name=job_name
+            name=self.get_job_name(user_id)
         )
         
         # Сохраняем ссылку на задачу
         self.user_jobs[user_id] = job
+        
+        log.debug(f'Установили напоминание для {user_id} {job}')
+        
+    
+    # * | Set reminder _____________________________________________|
+    # ? | Останавливаем джобу
+    async def stop_reminder_for_user(self, subscriber: "Subscriber"):  
+        user_id = subscriber.user_id
+  
+        jobs = self.application.job_queue.get_jobs_by_name(self.get_job_name(user_id))
+        for job in jobs:
+            job.schedule_removal()
+            log.debug(f'Останавливаем напоминание для {user_id} {job}')
+            
+            
+    # * | restore_reminders ________________________________________|
+    # ? | Восстанавливаем все напоминания
+    async def restore_reminders(self, context: "ContextTypes.DEFAULT_TYPE"):
+        subscribers = Subscriber.get_active_subscribers()
+        log.debug(f'Восстанавливаем напоминания {subscribers}')
+
+        for subscriber in subscribers:
+            log.debug(f'Возвращаем напоминание для {subscriber.user_id}')
+            await self.set_reminder_for_user(subscriber, subscriber.schedule_time)
+            
 
     # * |___________________________________________________________|

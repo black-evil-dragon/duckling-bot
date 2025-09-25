@@ -289,14 +289,20 @@ class StartModule(BaseModule):
         
         if setting == 'reminder':
             subscriber: "Subscriber" = Subscriber.objects.update_or_create(
-                user_id=user.user_id, defaults=dict(
+                user_id=user.id, defaults=dict(
                     is_active=user_settings.get('reminder', False)
                 )
             )
+
             if subscriber.schedule_time is None:
                 await ReminderModule.ask_reminder_time(update, context)
-            else:
-                await ReminderModule.sign_subscriber(user.id, user_settings.get('reminder', False))
+                return
+                
+            elif context.user_data.get('selected_group') is None:
+                await GroupModule.ask_institute(update, context)
+                return
+                
+            await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
         
         
         

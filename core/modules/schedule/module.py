@@ -178,7 +178,7 @@ class ScheduleModule(BaseModule):
         )
     
         if additional is not None:
-            data.update(**additional.get('user_data', {}))
+            data.update(**additional)
 
         request = dict(
             session=session,

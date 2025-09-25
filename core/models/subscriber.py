@@ -1,6 +1,6 @@
-from optparse import Option
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Time
 from sqlalchemy.orm import relationship, joinedload
+from sqlalchemy.orm import Session
 
 from db.core import Database, models
 
@@ -22,6 +22,14 @@ class Subscriber(models.BaseModel):
     
     def __str__(self):
         return f"Подписчик: {self.user_id}"
+    
+
+    def get_user(self, session: "Session" = None):
+        if session is None:
+            with Database.session_scope() as session:
+                return session.merge(self).user
+
+        return session.merge(self).user
     
     
     def set_scheduled_time(self, time: 'datetime.datetime'):
