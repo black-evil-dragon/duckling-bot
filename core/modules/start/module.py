@@ -205,7 +205,7 @@ class StartModule(BaseModule):
             None,
 
             None,
-            (f"delegate#{CommandNames.SET_REMINDER}", CommandNames.SET_REMINDER.label),
+            (f"delegate#{CommandNames.SET_REMINDER}", "⏰ Выбрать время"),
             (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
             
             None,
@@ -298,7 +298,7 @@ class StartModule(BaseModule):
                 await ReminderModule.ask_reminder_time(update, context)
                 return
                 
-            elif context.user_data.get('selected_group') is None:
+            if context.user_data.get('selected_group') is None:
                 await GroupModule.ask_institute(update, context)
                 return
                 

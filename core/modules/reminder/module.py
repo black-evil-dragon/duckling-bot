@@ -9,7 +9,7 @@ from telegram.ext import filters
 # * Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
 from core.models.user import User
-from core.modules.base import BaseModule
+from core.modules.base import BaseModule, strf_time_mask
 
 
 # * Other packages ________________________________________________________________________
@@ -32,7 +32,7 @@ log = get_logger()
 
 
 class ReminderModule(BaseModule):
-    content_cache: Dict[Tuple["datetime.date", int], str] = {}
+    content_cache: Dict[Tuple["datetime.date", int, int], str] = {}
     cache_lock = asyncio.Lock()
     
     user_jobs: Dict[str, "Job"] = {}
@@ -68,30 +68,7 @@ class ReminderModule(BaseModule):
     
     @classmethod
     def get_reminder_markup(cls, settings: dict):
-        return InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    text=f"На сегодня {'✅' if settings.get('reminder_today', True) else '❌'}",
-                    callback_data=f"settings#bool${not settings.get('reminder_today', True)}$reminder_today"
-                ),
-                InlineKeyboardButton(
-                    text=f"На завтра {'✅' if not settings.get('reminder_today', True) else '❌'}",
-                    callback_data=f"settings#bool${not settings.get('reminder_today', True)}$reminder_today"
-                ), 
-            ],
-            [
-                cls.delegate_button_template(
-                    messages.choose_reminder_time_button,
-                    f"{CommandNames.SET_REMINDER}"
-                )
-            ],
-            [
-                cls.menu_button, cls.delegate_button_template(
-                    "Настройки",
-                    f"{CommandNames.SETTINGS}"
-                )
-            ]
-            ])
+        return messages.reminder_keyboard_default(settings)
             
 
     # * ____________________________________________________________
@@ -124,6 +101,7 @@ class ReminderModule(BaseModule):
         
         await update_message.reply_text(
             text=text,
+            parse_mode='HTML',
             reply_markup=cls.get_reminder_markup(user_settings)
         )
         
@@ -137,6 +115,7 @@ class ReminderModule(BaseModule):
         # * Return
         await update_message.reply_text(
             text=messages.ask_reminder_time,
+            parse_mode='HTML',
         )
     # * |___________________________________________________________|
 
@@ -173,6 +152,7 @@ class ReminderModule(BaseModule):
         # * Return
         await update.message.reply_text(
             text=messages.success_selected_time_template(time.strftime('%H:%M')),
+            parse_mode='HTML',
             reply_markup=self.get_reminder_markup(user_settings)
         )
         return True
@@ -185,68 +165,106 @@ class ReminderModule(BaseModule):
     
     # * | broadcast ________________________________________________|
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
-        # {'user_id': 959259687, 'first_name': 'BlackEvilDragon', 'last_name': None, 'username': 'blackevil_dragon', 'selected_group': 233, 'selected_subgroup': 3, 'user_settings': {'reminder': True}, 'user_model': <User: Пользователь BlackEvilDragon>}
-        
         user_data: dict = context.job.data
-        user_id = user_data.get('user_id')
-        selected_group = user_data.get('selected_group')
+
+        user: "User" = user_data.get('instance')
+        user_id = user.user_id
+        user_settings: dict = user.get_user_settings()
+        
         current_date = datetime.datetime.now().date()
         
-        await asyncio.sleep(0.1)
+    
+        if not user_settings.get('reminder_today', True):
+            current_date += datetime.timedelta(days=1)
         
+        log.debug(f'Current date {current_date}, user_settings: {user_settings}')
+        content: dict = await self.get_cached_content(user, current_date)
+        
+        if not content:
+            log.debug(f'Не удалось сгенерировать контент для {user_id}')
+            return
+        
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=messages.reminder_say_hello(current_date.weekday())
+            )
 
+            await context.bot.send_message(
+                chat_id=user_id,
+                **content,
+            )
+            await asyncio.sleep(1)
+
+            log.debug(f"Отправлено напоминание пользователю {user_id}")
+        except Exception as e:
+            log.error(f"Ошибка отправки пользователю {user_id}: {e}")
+    
 
         
+    async def get_cached_content(self, user: "User", current_date: "datetime.date") -> dict:
+        group_id = user.group_id
+        subgroup_id = user.subgroup_id
+
+        cache_key = (current_date, group_id, subgroup_id)
         
-    async def get_cached_content(self, current_date: "datetime.date", group_id: int, user_data: dict) -> str:
-        cache_key = (current_date, group_id)
+        await self.cleanup_old_cache()
         
         # Проверяем кеш
         async with self.cache_lock:
             if cache_key in self.content_cache:
-                log.debug(f"Используем кешированный контент для группы {group_id} на {current_date}")
+                log.debug(f"Используем кешированный контент для группы {group_id} {subgroup_id} на {current_date}")
                 return self.content_cache[cache_key]
         
         # Генерируем новый контент
-        content = await self.generate_broadcast_content(current_date, group_id, user_data)
+        content = self.generate_broadcast_content(user, current_date)
         
         # Сохраняем в кеш
         if content:
             async with self.cache_lock:
                 self.content_cache[cache_key] = content
-                log.debug(f"Сгенерирован и закеширован контент для группы {group_id} на {current_date}")
+                log.debug(f"Сгенерирован и закеширован контент для группы {group_id} {subgroup_id} на {current_date}")
         
         return content
+    
+    async def cleanup_old_cache(self):
+        today = datetime.datetime.now().date()
+        tomorrow = today + datetime.timedelta(days=1)
+        
+        async with self.cache_lock:
+            keys_to_remove = []
+            
+            for cache_key in self.content_cache.keys():
+                cache_date, _, _ = cache_key
+
+                if cache_date not in [today, tomorrow]:
+                    keys_to_remove.append(cache_key)
+            
+            for key in keys_to_remove:
+                del self.content_cache[key]
+            
+            if keys_to_remove:
+                log.debug(f"Очищен кеш: удалено {len(keys_to_remove)} старых записей")
         
         
 
-    async def generate_broadcast_content(self, current_date: "datetime.date", group_id: int, user_data: dict) -> str:   
+    def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:   
         args = dict( 
             session=self.session,
-            group_id=group_id,
-            additional={}
+            group_id=user.group_id,
+            date_start=current_date.strftime(strf_time_mask),
+            user_data=dict(
+                **user.get_selected_data(),
+                user_settings=user.get_user_settings(),
+            )
         )
-        
-        if user_data.get('user_settings'):
-            user_settings: dict = user_data.get('user_settings', {})
-            
-
-            if not user_settings.get('reminder_today', True):
-                args.update(dict(
-                    date=current_date + datetime.timedelta(days=1),
-                ))
-
-            args["additional"].update(dict(
-                user_settings=user_settings
-            ))
         
         
         response: dict = ScheduleModule.get_schedule_by_group_id(**args)
-        
         message = ScheduleModule.get_message_schedule(response, is_daily=True)
+
         
-        print(message)
-        await asyncio.sleep(0.1)
+        return message
     
 
     # * | sign_subscriber __________________________________________|

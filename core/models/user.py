@@ -44,9 +44,10 @@ class User(models.BaseModel):
             **self.get_selected_data(),
             user_settings=self.get_user_settings(),
             
-            # scheduled_time=self.get_scheduled_time_reminder(),
-            
             user_model=self,
+            
+            # Лучше
+            instance=self
         )
         
         return user_data    
@@ -68,15 +69,6 @@ class User(models.BaseModel):
     def set_subgroup(self, selected_subgroup):
         self.subgroup_id = selected_subgroup
         self.save()
-        
-    
-    # * REMINDER
-    def get_scheduled_time_reminder(self):
-        # subscriber: Subscriber = Subscriber.objects.get(user=self)
-        # if not subscriber: return None, None
-        
-        # return subscriber.scheduled_time, Subscriber.TimeChoices.get_label(subscriber.scheduled_time)
-        pass
   
     
     # * SETTINGS MANAGEMENT

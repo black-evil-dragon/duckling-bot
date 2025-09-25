@@ -78,7 +78,8 @@ class ScheduleModule(BaseModule):
         
         if response_json.get('last_update'):
             response_json['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
-            
+        
+        log.debug(f'Отправлен запрос: {path}')
         return response_json
     
     
@@ -89,7 +90,6 @@ class ScheduleModule(BaseModule):
         user_data: dict = None,
         date_start: str = datetime.today().strftime(strf_time_mask),
         date_end: str = None,
-        additional: dict = None
     ):  
         if user_data is None:
             user_data = {}
@@ -118,10 +118,6 @@ class ScheduleModule(BaseModule):
             params.update(dict(
                 subgroup=user_data.get('selected_subgroup')
             ))
-            
-
-        if additional is not None:
-            params.update(**additional)
         
 
         return params
@@ -169,16 +165,17 @@ class ScheduleModule(BaseModule):
         group_id: int,
         date_start: "str" = datetime.today().strftime(strf_time_mask),
         date_end: "str" = None,
-        additional: dict = None
+        user_data: dict = None
     ) -> dict:
+        if user_data is None: user_data = {}
+
         data = dict(
             group_id=group_id,
             date_start=date_start,
             date_end=date_end,
+            user_data=user_data
         )
     
-        if additional is not None:
-            data.update(**additional)
 
         request = dict(
             session=session,
