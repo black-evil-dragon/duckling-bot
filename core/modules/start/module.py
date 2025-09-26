@@ -1,6 +1,5 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from types import FunctionType
 from telegram import Update
 from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
@@ -14,10 +13,11 @@ from telegram.error import BadRequest
 #* Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
 from core.models.user import User
+from core.modules.base.messages import get_commands_text, start_text
 from core.modules.reminder.module import ReminderModule
 from core.settings.commands import CommandNames
 
-from core.modules.base import BaseMessages, BaseModule
+from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_user_settings
 
 from core.modules.group.module import GroupModule
@@ -111,10 +111,8 @@ class StartModule(BaseModule):
     # * |               Command handlers                            |
     @classmethod
     async def start(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        user = update.effective_user
-
         await update.message.reply_text(
-            f'{messages.start_hello(user.username)}\n\n{BaseMessages.help_text}'
+            start_text
         )
 
         await cls.show_command_keyboard(update, context)
@@ -124,7 +122,7 @@ class StartModule(BaseModule):
     async def help(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         
-        await update_message.reply_text(BaseMessages.help_text)
+        await update_message.reply_text(get_commands_text())
         await cls.show_command_keyboard(update, context)
 
 

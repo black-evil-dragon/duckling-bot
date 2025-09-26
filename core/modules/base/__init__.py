@@ -16,20 +16,25 @@ from core.settings import COMMANDS
 from functools import wraps
 from typing import Callable
 
+from core.settings.commands import CommandNames
+
 
 strf_time_mask = "%Y-%m-%d"
 
 
-
+# !DEPRECATED
 class BaseMessages:
     # * TEXT ___________________________________________________________________
 
     help_text = '\n'.join((
         f'/{command} - {description}' for command, description in COMMANDS
     ))
+    
+    
+    attempts_error_message = f"Максимальное количество попыток, похоже, что что-то пошло не так.\nПопробуйте еще раз или сообщите об этом разработчику\n\n/{CommandNames.HELP}"
 
     # * TEMPLATES ___________________________________________________________________
-
+# !END DEPRECATED
 
 
 

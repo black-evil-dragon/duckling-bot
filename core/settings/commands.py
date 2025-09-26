@@ -7,7 +7,7 @@ from db.core.models.enums import TextChoices
 from typing import List, Tuple
 
 class CommandNames(TextChoices):
-    START = "start", "Запуск"
+    START = "start", "Обо мне"
     HELP = "help", "Помощь"
     MENU = "menu", "Меню"
     SETTINGS = "settings", "Настройки"
@@ -52,6 +52,7 @@ class Command:
 
 
 COMMANDS_LIST = [
+    Command(CommandNames.START),
     Command(CommandNames.SCHEDULE, "Расписание (в зависимости от выбора)"),
     Command(CommandNames.MENU),
     Command(CommandNames.SET_GROUP),

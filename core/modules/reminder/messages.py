@@ -1,4 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 from core.modules.base import BaseModule
 from core.settings.commands import CommandNames
 
@@ -7,7 +8,11 @@ from core.settings.commands import CommandNames
 choose_reminder_time_button = "⏰ Выбрать время"
 ask_reminder_time = "⏰ Пожалуйста, введите время в формате ЧЧ:ММ (например, 14:30)"
 wrong_format_time = "❌ Неверный формат времени. Пожалуйста, используйте ЧЧ:ММ (например, 09:30)"
-reminder_help_text = "<b>На сегодня</b> - расписание на текущий день рассылки\n<b>На завтра</b> - расписание на следующий день рассылки\n<b>Выбрать время</b> - задайте время для рассылки"
+reminder_help_text = "<b>На сегодня</b> - расписание на текущий день рассылки\n<b>На завтра</b> - расписание на следующий день рассылки\n<b>Выбрать время</b> - задать время для рассылки"
+group_is_empty = f"❌ Извини, сегодня без рассылки(\nГруппа пуста. Выбери группу с помощью команды /{CommandNames.SET_GROUP}"
+
+
+
 # * TEMPLATES ___________________________________________________________________
 def success_selected_time_template(time):
     return f"✅ Время напоминания установлено на {time}"

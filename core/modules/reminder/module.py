@@ -1,9 +1,9 @@
 
 # * Telegram bot framework ________________________________________________________________________
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Update
+from telegram import Update
 
 from telegram.ext import ContextTypes, Application
-from telegram.ext import CommandHandler, MessageHandler, JobQueue, Job
+from telegram.ext import CommandHandler, MessageHandler, Job
 from telegram.ext import filters
 
 # * Core ________________________________________________________________________
@@ -173,11 +173,19 @@ class ReminderModule(BaseModule):
         
         current_date = datetime.datetime.now().date()
         
+        
+        if user.group_id is None:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=messages.group_is_empty
+            )
+            return
+            
     
         if not user_settings.get('reminder_today', True):
             current_date += datetime.timedelta(days=1)
         
-        log.debug(f'Current date {current_date}, user_settings: {user_settings}')
+        # log.debug(f'Current date {current_date}, user_settings: {user_settings}')
         content: dict = await self.get_cached_content(user, current_date)
         
         if not content:
@@ -195,8 +203,10 @@ class ReminderModule(BaseModule):
                 **content,
             )
             await asyncio.sleep(1)
-
+            
             log.debug(f"Отправлено напоминание пользователю {user_id}")
+        
+        
         except Exception as e:
             log.error(f"Ошибка отправки пользователю {user_id}: {e}")
     

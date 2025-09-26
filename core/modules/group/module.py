@@ -1,6 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, User
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram import Update
 
 from telegram.ext import CommandHandler, MessageHandler
@@ -13,9 +13,7 @@ from core.modules.base.decorators import ensure_dialog_branch, ensure_user_setti
 from core.modules.group import messages
 
 from core.settings.commands import CommandNames
-
 from core.data.group import SUBGROUP_IDS, Group
-
 from core.models import User as UserModel
 
 #* Other packages ________________________________________________________________________
@@ -42,7 +40,7 @@ class GroupModule(BaseModule):
             group=1
         )
         application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_subgroup_selection),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_subgroup),
             group=2
         )
 
@@ -174,11 +172,6 @@ class GroupModule(BaseModule):
             await self.selection_group(update, context)
 
 
-    @ensure_dialog_branch('subgroup_selection')
-    async def handle_subgroup_selection(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        await self.selection_subgroup(update, context)
-
-
     #* ---------- Select institute 
     @ensure_dialog_branch('group_selection')
     async def selection_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
@@ -192,12 +185,13 @@ class GroupModule(BaseModule):
             )
 
             await self.ask_institute(update, context)
+            return
 
-        else:
-            context.user_data["selected_institute"] = user_input
 
-            await self.ask_course(update, context)
+        context.user_data["selected_institute"] = user_input
 
+        await self.ask_course(update, context)
+        return True
 
 
 
@@ -217,11 +211,13 @@ class GroupModule(BaseModule):
             )
 
             await self.ask_course(update, context)
+            return
         
-        else:
-            context.user_data["selected_course"] = user_input
 
-            await self.ask_group(update, context)
+        context.user_data["selected_course"] = user_input
+
+        await self.ask_group(update, context)
+        return True
             
 
 
@@ -254,7 +250,7 @@ class GroupModule(BaseModule):
                 messages.choose_group,
                 reply_markup=reply_markup
             )
-            return
+            return True
         else:
             await update.message.reply_text(
                 messages.group_wrong_choice,

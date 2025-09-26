@@ -72,7 +72,10 @@ class ScheduleModule(BaseModule):
             json=params
         )
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as error:
+            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response}. Данные запроса: {params}')
         
         response_json: dict = response.json()
         
