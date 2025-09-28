@@ -288,17 +288,15 @@ class GroupModule(BaseModule):
         if user_input not in SUBGROUP_IDS:
             await update.message.reply_text(
                 messages.subgroup_wrong_choice,
-                # reply_markup=ReplyKeyboardRemove()
             )
 
-            # await self.ask_subgroup(update, context)
             return
 
         selected_subgroup = SUBGROUP_IDS[user_input]
         
         context.user_data["selected_subgroup"] = selected_subgroup
 
-        user.set_subgroup(selected_subgroup)
+        user.set_subgroup(selected_subgroup, set_subgroup_lock=True)
         
 
         await update.message.reply_text(

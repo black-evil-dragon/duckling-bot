@@ -66,8 +66,17 @@ class User(models.BaseModel):
         self.group_id = selected_group
         self.save()
         
-    def set_subgroup(self, selected_subgroup):
+    def set_subgroup(self, selected_subgroup, set_subgroup_lock=False):
         self.subgroup_id = selected_subgroup
+        
+        settings = self.get_user_settings()
+        
+        if settings.get('subgroup_lock', True):
+            settings.update(dict(
+                subgroup_lock=set_subgroup_lock
+            ))
+            self.set_user_settings(settings)
+            
         self.save()
   
     

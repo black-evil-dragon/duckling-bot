@@ -10,12 +10,14 @@ ask_reminder_time = "⏰ Пожалуйста, введите время в фо
 wrong_format_time = "❌ Неверный формат времени. Пожалуйста, используйте ЧЧ:ММ (например, 09:30)"
 time_is_not_chosen = (
     "❌ Выбери время для рассылки перед установкой напоминания"
+    f"\n\n/{CommandNames.SET_REMINDER}"
 )
 
 
 group_is_empty = f"❌ Извини, сегодня без рассылки(\nГруппа пуста. Выбери группу с помощью команды /{CommandNames.SET_GROUP}"
 group_is_not_chosen = (
     "❌ Выбери группу перед установкой напоминания"
+    f"\n\n/{CommandNames.SET_GROUP}"
 )
 
 reminder_help_text = "<b>На сегодня</b> - расписание на текущий день рассылки\n<b>На завтра</b> - расписание на следующий день рассылки\n<b>Выбрать время</b> - задать время для рассылки"
@@ -51,6 +53,12 @@ def reminder_say_hello(day_id: int):
 # * KEYBOARDS
 def reminder_keyboard_default(settings: dict):
     return InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    text=f"Рассылка {'✅' if settings.get('reminder', False) else '❌'}",
+                    callback_data=f"settings#bool${not settings.get('reminder', False)}$reminder"
+                ),
+            ],
             [
                 InlineKeyboardButton(
                     text=f"На сегодня {'✅' if settings.get('reminder_today', True) else '❌'}",

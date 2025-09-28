@@ -2,20 +2,16 @@
 
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import InlineKeyboardButton, Update
-from telegram.ext import Application, ContextTypes
+from telegram import InlineKeyboardButton
+from telegram.ext import Application
 
 
 #* Core ________________________________________________________________________
-from core.models.user import User
 from core.modules.base.decorators import ensure_user_settings
 from core.settings import COMMANDS
 
 
 #* Other packages ________________________________________________________________________
-from functools import wraps
-from typing import Callable
-
 from core.settings.commands import CommandNames
 
 

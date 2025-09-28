@@ -219,6 +219,7 @@ class StartModule(BaseModule):
 
 
     @classmethod
+    @ensure_user_settings(need_update=True)
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
@@ -299,7 +300,7 @@ class StartModule(BaseModule):
                     text=reminder_messages.group_is_not_chosen,
                 )
                 await asyncio.sleep(.5)
-                await GroupModule.ask_institute(update, context)
+                # await GroupModule.ask_institute(update, context)
 
                 return
             
@@ -307,11 +308,11 @@ class StartModule(BaseModule):
             if subscriber.schedule_time is None:
                 await context.bot.send_message(
                     chat_id=user.user_id,
-                    text=reminder_messages.group_is_not_chosen,
+                    text=reminder_messages.time_is_not_chosen,
                 )
-                asyncio.sleep(.5)
+                await asyncio.sleep(.5)
 
-                await ReminderModule.ask_reminder_time(update, context)
+                # await ReminderModule.ask_reminder_time(update, context)
                 return
                 
                 

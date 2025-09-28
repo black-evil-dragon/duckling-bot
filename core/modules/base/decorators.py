@@ -62,7 +62,13 @@ class ContextManage:
     
     # * DIALOG MANAGER
     def set_dialog_process(self, value: bool, dialog_name: str) -> "ContextTypes.DEFAULT_TYPE":
+        for field in self.context.user_data:
+            field: str
+            if field.startswith('dialog_branch__'):
+                self.context.user_data[field] = False
+                
         self.context.user_data[f'dialog_branch__{dialog_name}'] = value
+    
         return self.context
 
     def is_dialog_process(self, dialog_name: str) -> bool:
@@ -154,7 +160,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
             manager = ContextManage()
             manager.set_context_from_args(args)
             
-            log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
+            # log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
             
             # * Проверяем, активен ли диалог
             if manager.is_dialog_process(dialog_name):
@@ -168,23 +174,23 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
                         data.update(**result)
     
                     if stop_after and data.get('stop_dialog', True):
-                        log.debug('Stop dialog')
+                        # log.debug('Stop dialog')
                         manager.set_dialog_process(False, dialog_name)
                         
                     manager.reset_context_attempt()
                     
-                    log.debug('Leave dialog branch')
+                    # log.debug('Leave dialog branch')
                     
                     return result
                 
                 if result is None:
-                    log.debug('Result is None')
+                    # log.debug('Result is None')
                     manager.increment_context_attempt()
                     
-                    log.debug(f'New attempt count {manager.current_attempt()}')
+                    # log.debug(f'New attempt count {manager.current_attempt()}')
                     
                     if manager.current_attempt() > max_attempts:
-                        log.debug('Max try reached')
+                        # log.debug('Max try reached')
                         manager.reset_context_attempt()
                         
                         manager.set_error(dict(

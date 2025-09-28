@@ -1,10 +1,10 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Time
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Time
 from sqlalchemy.orm import relationship, joinedload
 from sqlalchemy.orm import Session
 
 from db.core import Database, models
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 import datetime
 
 
@@ -38,6 +38,8 @@ class Subscriber(models.BaseModel):
         
         
     def get_schedule_time(self, to_str: bool = False) -> Optional[Union[str, datetime.time]]:
+        self.schedule_time: Optional[datetime.datetime | None]
+
         if self.schedule_time is None:
             return None
         
@@ -47,15 +49,11 @@ class Subscriber(models.BaseModel):
         return self.schedule_time
     
     
-    
     @classmethod
     def get_active_subscribers(cls) -> List['Subscriber']:        
         with Database.session_scope() as session:
             joined_table = session.query(cls).options(joinedload(cls.user))
-            return [subscriber for subscriber in joined_table.filter(cls.is_active) if subscriber.user and subscriber.user.group_id]
-    
-    
-    @classmethod
-    def get_subscriber_by_unique_times(cls, times: list) -> List['Subscriber']:
-        with Database.session_scope() as session:
-            pass
+            return [
+                subscriber for subscriber in joined_table.filter(cls.is_active)
+                if subscriber.user and subscriber.user.group_id and subscriber.schedule_time
+            ]

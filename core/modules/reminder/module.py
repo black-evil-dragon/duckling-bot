@@ -9,7 +9,7 @@ from telegram.ext import filters
 # * Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
 from core.models.user import User
-from core.modules.base import BaseModule, strf_time_mask
+from core.modules.base import BaseModule
 
 
 # * Other packages ________________________________________________________________________
@@ -135,7 +135,7 @@ class ReminderModule(BaseModule):
         try:
             time = datetime.datetime.strptime(user_input, '%H:%M').time()
         except Exception:
-            log.debug('Неверный формат времени', exc_info=True)
+            # log.debug('Неверный формат времени')
             await update.message.reply_text(messages.wrong_format_time)
             return False
 
@@ -147,6 +147,7 @@ class ReminderModule(BaseModule):
             user_id=user.id,
             defaults=dict(
                 schedule_time=time,
+                is_active=user_settings.get('reminder', False),
             )
         )
         

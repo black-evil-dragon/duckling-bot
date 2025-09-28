@@ -400,7 +400,7 @@ class ScheduleModule(BaseModule):
             await query.edit_message_text(messages.schedule_without_data)
             return
         
-        message = messages.format_schedule_weeks(data, week_idx)
+        message = messages.serialize_schedule_weeks(data, week_idx)
         
         prev_key = None if week_idx == 0 else week_idx - 1
         next_key = None if week_idx == len(data['data']) - 1 else week_idx + 1
