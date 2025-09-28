@@ -289,9 +289,10 @@ class StartModule(BaseModule):
         
         if setting == 'reminder':
             subscriber: "Subscriber" = Subscriber.objects.update_or_create(
-                user_id=user.id, defaults=dict(
-                    is_active=user_settings.get('reminder', False)
-                )
+                user_id=user.id,
+                # defaults=dict(
+                #     is_active=user_settings.get('reminder', False)
+                # )
             )
 
             if context.user_data.get('selected_group') is None:
@@ -299,9 +300,7 @@ class StartModule(BaseModule):
                     chat_id=user.user_id,
                     text=reminder_messages.group_is_not_chosen,
                 )
-                await asyncio.sleep(.5)
                 # await GroupModule.ask_institute(update, context)
-
                 return
             
     
@@ -310,8 +309,6 @@ class StartModule(BaseModule):
                     chat_id=user.user_id,
                     text=reminder_messages.time_is_not_chosen,
                 )
-                await asyncio.sleep(.5)
-
                 # await ReminderModule.ask_reminder_time(update, context)
                 return
                 
