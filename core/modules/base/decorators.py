@@ -154,23 +154,26 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
             manager = ContextManage()
             manager.set_context_from_args(args)
             
-            # log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
+            log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
             
             # * Проверяем, активен ли диалог
             if manager.is_dialog_process(dialog_name):
                 result = await func(*args, **kwargs)
-                data = {}
+                data = dict(
+                    stop_dialog=True
+                )
                     
                 if result is not None:
                     if isinstance(result, dict):
-                        data = result
+                        data.update(**result)
     
-                    if stop_after and data.get('stop_dialog', False):
+                    if stop_after and data.get('stop_dialog', True):
+                        log.debug('Stop dialog')
                         manager.set_dialog_process(False, dialog_name)
                         
                     manager.reset_context_attempt()
                     
-                    # log.debug('Leave dialog branch')
+                    log.debug('Leave dialog branch')
                     
                     return result
                 
@@ -178,10 +181,10 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
                     log.debug('Result is None')
                     manager.increment_context_attempt()
                     
-                    # log.debug(f'New attempt count {manager.current_attempt()}')
+                    log.debug(f'New attempt count {manager.current_attempt()}')
                     
                     if manager.current_attempt() > max_attempts:
-                        # log.debug('Max try reached')
+                        log.debug('Max try reached')
                         manager.reset_context_attempt()
                         
                         manager.set_error(dict(

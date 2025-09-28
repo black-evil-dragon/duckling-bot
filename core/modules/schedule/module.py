@@ -351,10 +351,11 @@ class ScheduleModule(BaseModule):
             schedule = dict(
                 group=response_data.get("group", ""),
                 data=prepare_schedule_weeks_data(response_data.get("data", {})),
+                last_update=response_data.get("data", {}).get('last_update', "")
             )
             context.user_data['schedule_weeks_data'] = schedule
             
-            message = messages.format_schedule_weeks(schedule, 0)
+            message = messages.serialize_schedule_weeks(schedule, 0)
             next_key = None if not len(schedule['data']) - 1 else 1
 
             await update_message.reply_text(
