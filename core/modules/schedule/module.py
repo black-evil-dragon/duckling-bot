@@ -421,9 +421,9 @@ class ScheduleModule(BaseModule):
 
 
 
-    @staticmethod
+
     @ensure_user_settings()
-    async def schedule_day_callback(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
         
         query = update.callback_query
@@ -435,6 +435,10 @@ class ScheduleModule(BaseModule):
 
         if not session:
             await query.edit_message_text(messages.session_error)
+            return
+        
+        if not context.user_data.get('selected_group', False):
+            await GroupModule.ask_institute(update, context)
             return
         
         args = dict( 
