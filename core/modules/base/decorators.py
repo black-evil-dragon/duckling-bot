@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from core.models.user import User
@@ -12,6 +12,64 @@ from typing import Callable, Tuple
 log = get_logger()
 
 # * UTILS _____________________________________________________________________
+
+# Вообще странная штуковина, получилось вот так
+class ContextManage:
+    context: "ContextTypes.DEFAULT_TYPE"
+    update: "Update"
+    
+    def set_context(self, context: "ContextTypes.DEFAULT_TYPE") -> None:
+        self.context = context
+    
+    def set_context_from_args(self, args):
+        self.update, self.context = self.get_update_context(args)
+        
+    def get_update_context(self, args) -> None:
+        for i in range(len(args) - 1, 0, -1):
+            if (i > 0 and 
+                isinstance(args[i-1], Update) and 
+                hasattr(args[i], 'user_data')):
+                
+                return args[i-1], args[i]
+        return None, None
+
+    def get_context(self) -> "ContextTypes.DEFAULT_TYPE":
+        return self.context
+    
+    def get_update(self) -> "Update":
+        return self.update
+
+
+    # * ERROR MANAGER
+    def set_error(self, error: dict) -> "ContextTypes.DEFAULT_TYPE":
+        self.context.user_data['error'] = error
+        
+        
+    # * ATTEMPT MANAGER
+    def current_attempt(self) -> int:
+        return self.context.user_data.get('attempt', 0)
+    
+    def increment_context_attempt(self) -> "ContextTypes.DEFAULT_TYPE":
+        attempt = self.current_attempt() + 1
+        self.context.user_data['attempt'] = attempt
+        
+        return self.context
+    
+    def reset_context_attempt(self) -> "ContextTypes.DEFAULT_TYPE":
+        self.context.user_data['attempt'] = 0
+        return self.context
+    
+    
+    # * DIALOG MANAGER
+    def set_dialog_process(self, value: bool, dialog_name: str) -> "ContextTypes.DEFAULT_TYPE":
+        self.context.user_data[f'dialog_branch__{dialog_name}'] = value
+        return self.context
+
+    def is_dialog_process(self, dialog_name: str) -> bool:
+        return self.context.user_data.get(f'dialog_branch__{dialog_name}', False)
+              
+              
+                
 def get_update_context(args) -> Tuple["Update", "ContextTypes.DEFAULT_TYPE"]:
     for i in range(len(args) - 1, 0, -1):
         if (i > 0 and 
@@ -21,23 +79,20 @@ def get_update_context(args) -> Tuple["Update", "ContextTypes.DEFAULT_TYPE"]:
     return None, None
 
 
-async def handle_error(context: "ContextTypes.DEFAULT_TYPE", dialog_name: str = None) -> "ContextTypes.DEFAULT_TYPE":
-    # user_id = context.user_data.get('user_id', None)
-    # error: dict = context.user_data.get('error', {})
-    
-    # if user_id and error:
-    #     await context.bot.send_message(
-    #         chat_id=user_id,
-    #         text=error.get('message', messages.unknown_error),
-    #     )
 
-    #     # Сбрасываем счетчик попыток и диалог
-    #     context.user_data['dialog_branch__attempt'] = 0
-    #     if dialog_name is not None:
-    #         context.user_data[f'dialog_branch__{dialog_name}'] = False
-        
-    #     # Очищаем ошибку
-    #     context.user_data['error'] = None
+async def handle_error(context: "ContextTypes.DEFAULT_TYPE", dialog_name: str = None) -> "ContextTypes.DEFAULT_TYPE":
+    user_id = context.user_data.get('user_id', None)
+    error: dict = context.user_data.get('error', {})
+    
+    reply_markup = ReplyKeyboardMarkup(context.bot_data.get('command_keyboard'), one_time_keyboard=True, resize_keyboard=True)
+    
+    if user_id and error:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=error.get('message', messages.unknown_error),
+            reply_markup=reply_markup,
+        )
+        context.user_data['error'] = None
     
     return context
 
@@ -56,9 +111,10 @@ def send_on_error():
     def decorator(func: Callable) -> Callable:        
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            _, context = get_update_context(args)
+            manager = ContextManage()
+            manager.set_context_from_args(args)
     
-            context = handle_error(context)
+            await handle_error(manager.get_context())
             
             return await func(*args, **kwargs)
 
@@ -68,15 +124,19 @@ def send_on_error():
 
 
 
-def set_dialog_branch(dialog_name: str):
+
+def set_dialog_branch(dialog_name: str, value: bool = True, reset_attempt: bool = False):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            update, context = get_update_context(args)
+    
+            manager = ContextManage()
+            manager.set_context_from_args(args)
             
-            context.user_data[f'dialog_branch__{dialog_name}'] = True
-            context.user_data['dialog_branch__attempt'] = 0
-            context.user_data['error'] = None
+            if reset_attempt:
+                manager.reset_context_attempt()
+
+            manager.set_dialog_process(value, dialog_name)
             
             return func(*args, **kwargs)
         
@@ -84,82 +144,57 @@ def set_dialog_branch(dialog_name: str):
     return decorator
 
 
-
-def ensure_dialog_branch(dialog_name: str, is_await=True, stop_after: bool = False, max_attempts: int = 3):
+def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempts: int = 2):
     """Декоратор для проверки диалоговой ветки"""
     
     def decorator(func: Callable) -> Callable:
-        
-        def count_attempts(context: "ContextTypes.DEFAULT_TYPE") -> int:
-            current_attempt = context.user_data.get('dialog_branch__attempt', 0) + 1
-            context.user_data['dialog_branch__attempt'] = current_attempt
-            return current_attempt
-        
-        def is_dialog_process(dialog_name: str, context: "ContextTypes.DEFAULT_TYPE") -> bool:
-            return context.user_data.get(f'dialog_branch__{dialog_name}', False)
-        
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            update, context = get_update_context(args)
+        async def wrapper(*args, **kwargs):
             
-            # context = await handle_error(context, dialog_name)
+            manager = ContextManage()
+            manager.set_context_from_args(args)
             
-            # Проверяем, активен ли диалог
-            if is_dialog_process(dialog_name, context):
-            #     # Проверяем количество попыток
-            #     if count_attempts(context) > max_attempts:
-            #         context.user_data['error'] = {
-            #             'message': messages.attempts_error_message
-            #         }
-            #         context = await handle_error(context, dialog_name)
-            #         return None
-                
+            # log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
+            
+            # * Проверяем, активен ли диалог
+            if manager.is_dialog_process(dialog_name):
                 result = await func(*args, **kwargs)
-                
-
-                if stop_after:
-                    context.user_data[f'dialog_branch__{dialog_name}'] = False
-                    context.user_data['dialog_branch__attempt'] = 0
-                
-                return result
+                data = {}
                     
-            #     except Exception as e:
-            #         # Обработка исключений
-            #         context.user_data['error'] = {
-            #             'message': str(e)
-            #         }
-            #         context = await handle_error(context, dialog_name)
-            #         return None
-            # else:
-            #     # Диалог не активен - пропускаем выполнение
-            #     return None
-            pass
-        
-        @wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            # # Синхронная версия (аналогичная логика)
-            # update, context = get_update_context(args)
-            
-            # if is_dialog_process(dialog_name, context):
-            #     if count_attempts(context) > max_attempts:
-            #         context.user_data['error'] = {
-            #             'message': messages.attempts_error_message
-            #         }
-            #         return None
-                
-            #     result = func(*args, **kwargs)
-                
-            #     if stop_after:
-            #         context.user_data[f'dialog_branch__{dialog_name}'] = False
-            #         context.user_data['dialog_branch__attempt'] = 0
-                
-            #     return result
-            # else:
-            #     return None
-            pass
-        
-        return async_wrapper if is_await else sync_wrapper
+                if result is not None:
+                    if isinstance(result, dict):
+                        data = result
     
+                    if stop_after and data.get('stop_dialog', False):
+                        manager.set_dialog_process(False, dialog_name)
+                        
+                    manager.reset_context_attempt()
+                    
+                    # log.debug('Leave dialog branch')
+                    
+                    return result
+                
+                if result is None:
+                    log.debug('Result is None')
+                    manager.increment_context_attempt()
+                    
+                    # log.debug(f'New attempt count {manager.current_attempt()}')
+                    
+                    if manager.current_attempt() > max_attempts:
+                        # log.debug('Max try reached')
+                        manager.reset_context_attempt()
+                        
+                        manager.set_error(dict(
+                            message=messages.attempts_error_message
+                        ))
+                                                
+                        await handle_error(manager.get_context())
+                        manager.set_dialog_process(False, dialog_name)
+        
+
+                    return result
+        
+        return wrapper
     return decorator
 
 

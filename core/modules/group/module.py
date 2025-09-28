@@ -9,7 +9,7 @@ from telegram.ext import filters
 
 #* Core ________________________________________________________________________
 from core.modules.base import BaseModule
-from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch
+from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, send_on_error, set_dialog_branch
 from core.modules.group import messages
 
 from core.settings.commands import CommandNames
@@ -59,11 +59,10 @@ class GroupModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Command handlers                            |
-
     #? /set_group - Изменяет группу пользователя
     @classmethod
     @ensure_user_settings(need_update=True)
-    @set_dialog_branch('group_selection')
+    @set_dialog_branch('group_selection', reset_attempt=True)
     async def ask_institute(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         cls.clear_choices(context)
         update_message = update.message or update.callback_query.message
@@ -85,6 +84,7 @@ class GroupModule(BaseModule):
 
 
     @classmethod
+    @set_dialog_branch('group_selection', reset_attempt=False)
     async def ask_course(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         institute = context.user_data.get("selected_institute")
         courses = list(GroupModule.group_ids[institute])
@@ -105,6 +105,7 @@ class GroupModule(BaseModule):
 
 
     @classmethod
+    @set_dialog_branch('group_selection', reset_attempt=False)
     async def ask_group(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         institute = context.user_data.get("selected_institute")
         course = context.user_data.get("selected_course")
@@ -156,8 +157,7 @@ class GroupModule(BaseModule):
 
 
     # * ____________________________________________________________
-    # * |               Message handlers                            |
-    @ensure_dialog_branch('group_selection')
+    # * |               Message handlers                            |)
     async def handle_group_selection(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         # Выбор института
         if context.user_data.get("selected_institute") is None:
@@ -168,7 +168,7 @@ class GroupModule(BaseModule):
             await self.selection_course(update, context)
         
         # Выбор группы
-        else:
+        elif context.user_data.get("selected_group") is None:
             await self.selection_group(update, context)
 
 
@@ -181,10 +181,10 @@ class GroupModule(BaseModule):
             
             await update.message.reply_text(
                 messages.institute_wrong_choice,
-                reply_markup=ReplyKeyboardRemove()
+                # reply_markup=ReplyKeyboardRemove()
             )
 
-            await self.ask_institute(update, context)
+            # await self.ask_institute(update, context)
             return
 
 
@@ -210,7 +210,7 @@ class GroupModule(BaseModule):
                 messages.course_wrong_choice
             )
 
-            await self.ask_course(update, context)
+            # await self.ask_course(update, context)
             return
         
 
@@ -250,7 +250,8 @@ class GroupModule(BaseModule):
                 messages.choose_group,
                 reply_markup=reply_markup
             )
-            return True
+            # Коммент ниже
+            return dict(stop_dialog=False)
         else:
             await update.message.reply_text(
                 messages.group_wrong_choice,
@@ -265,13 +266,21 @@ class GroupModule(BaseModule):
             messages.result_choices(institute, course, user_input),
             reply_markup=ReplyKeyboardRemove()
         )
-        return True
+        
+        # Столкнулся с тем, что этод метод должен продолжить работу
+        # Пока код находит среди ввода группы, но и при этом не завершать
+        # работу dialog с помощью stop_after=True
+        # Поэтому я решил сделать так
+        # Делать return dict(...), чтобы return value был не None
+        # и при этом можно было разделить успешность работы
+        return dict(stop_dialog=True)
 
 
 
     #* ---------- Select subgroup
     @ensure_user_settings()
     @ensure_dialog_branch('subgroup_selection', stop_after=True)
+    @send_on_error()
     async def selection_subgroup(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user: UserModel = context.user_data.get("user_model")
         user_input = update.message.text
@@ -279,10 +288,10 @@ class GroupModule(BaseModule):
         if user_input not in SUBGROUP_IDS:
             await update.message.reply_text(
                 messages.subgroup_wrong_choice,
-                reply_markup=ReplyKeyboardRemove()
+                # reply_markup=ReplyKeyboardRemove()
             )
 
-            await self.ask_subgroup(update, context)
+            # await self.ask_subgroup(update, context)
             return
 
         selected_subgroup = SUBGROUP_IDS[user_input]

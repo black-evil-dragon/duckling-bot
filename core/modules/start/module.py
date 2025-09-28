@@ -1,5 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
+import asyncio
 from telegram import Update
 from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
@@ -24,7 +25,7 @@ from core.modules.group.module import GroupModule
 from core.modules.schedule.module import ScheduleModule
 
 from core.modules.start import messages
-
+from core.modules.reminder import messages as reminder_messages
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
 
@@ -148,6 +149,7 @@ class StartModule(BaseModule):
 
         return MENU_COMMANDS
 
+
     @classmethod
     @ensure_user_settings(need_update=True)
     async def get_menu(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
@@ -163,7 +165,6 @@ class StartModule(BaseModule):
             "📋 Главное меню:",
             reply_markup=reply_markup
         )
-
 
 
 
@@ -292,13 +293,27 @@ class StartModule(BaseModule):
                 )
             )
 
+            if context.user_data.get('selected_group') is None:
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text=reminder_messages.group_is_not_chosen,
+                )
+                await asyncio.sleep(.5)
+                await GroupModule.ask_institute(update, context)
+
+                return
+            
+    
             if subscriber.schedule_time is None:
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text=reminder_messages.group_is_not_chosen,
+                )
+                asyncio.sleep(.5)
+
                 await ReminderModule.ask_reminder_time(update, context)
                 return
                 
-            if context.user_data.get('selected_group') is None:
-                await GroupModule.ask_institute(update, context)
-                return
                 
             await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
         

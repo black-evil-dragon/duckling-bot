@@ -61,14 +61,18 @@ class ReminderModule(BaseModule):
         
         application.job_queue.run_once(self.restore_reminders, when=2)
         
+        
+        
     # * ____________________________________________________________
     # * |               Helpers                                     |
     def get_job_name(self, user_id: int):
         return f"reminder_{user_id}"
     
+    
     @classmethod
     def get_reminder_markup(cls, settings: dict):
         return messages.reminder_keyboard_default(settings)
+            
             
 
     # * ____________________________________________________________
@@ -163,6 +167,8 @@ class ReminderModule(BaseModule):
     # * ____________________________________________________________
     # * |                       Logic                               |
     
+    
+    # *                      Broadcast logic
     # * | broadcast ________________________________________________|
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
         user_data: dict = context.job.data
@@ -185,7 +191,6 @@ class ReminderModule(BaseModule):
         if not user_settings.get('reminder_today', True):
             current_date += datetime.timedelta(days=1)
         
-        # log.debug(f'Current date {current_date}, user_settings: {user_settings}')
         content: dict = await self.get_cached_content(user, current_date)
         
         if not content:
@@ -211,7 +216,7 @@ class ReminderModule(BaseModule):
             log.error(f"Ошибка отправки пользователю {user_id}: {e}")
     
 
-        
+    # Получение щакешированного контента
     async def get_cached_content(self, user: "User", current_date: "datetime.date") -> dict:
         group_id = user.group_id
         subgroup_id = user.subgroup_id
@@ -237,6 +242,8 @@ class ReminderModule(BaseModule):
         
         return content
     
+    
+    # Очистка старого кеша
     async def cleanup_old_cache(self):
         today = datetime.datetime.now().date()
         tomorrow = today + datetime.timedelta(days=1)
@@ -257,12 +264,11 @@ class ReminderModule(BaseModule):
                 log.debug(f"Очищен кеш: удалено {len(keys_to_remove)} старых записей")
         
         
-
     def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:   
         args = dict( 
             session=self.session,
             group_id=user.group_id,
-            date_start=current_date.strftime(strf_time_mask),
+            date_start=current_date,
             user_data=dict(
                 **user.get_selected_data(),
                 user_settings=user.get_user_settings(),
@@ -270,13 +276,15 @@ class ReminderModule(BaseModule):
         )
         
         
-        response: dict = ScheduleModule.get_schedule_by_group_id(**args)
-        message = ScheduleModule.get_message_schedule(response, is_daily=True)
+        schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
+        message = ScheduleModule.get_message_schedule(schedule, is_daily=True)
 
         
         return message
     
-
+    
+    
+    # *                  Reminder logic
     # * | sign_subscriber __________________________________________|
     # ? | Подписываем пользователя на интервальное событие
     # ? | или отписываем
@@ -298,10 +306,7 @@ class ReminderModule(BaseModule):
         
         await instance.set_reminder_for_user(subscriber, reminder_time, user)
         
-
-    
-
-    
+        
     # * | Set reminder _____________________________________________|
     # ? | Ставим джобу
     async def set_reminder_for_user(self, subscriber: "Subscriber", reminder_time: "datetime.time", user: "User" = None):
@@ -334,7 +339,7 @@ class ReminderModule(BaseModule):
         log.debug(f'Установили напоминание для {user_id} {job}')
         
     
-    # * | Set reminder _____________________________________________|
+    # * | Stop reminder _____________________________________________|
     # ? | Останавливаем джобу
     async def stop_reminder_for_user(self, subscriber: "Subscriber"):  
         user_id = subscriber.user_id

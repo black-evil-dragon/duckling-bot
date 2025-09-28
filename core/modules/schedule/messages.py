@@ -61,7 +61,7 @@ def get_refresh_button(callback_data: str) -> 'InlineKeyboardButton':
 
 schedule_not_found = "Расписание пустое"
 schedule_without_data = f"Данные расписания отсутствуют. Запросите расписание снова /{CommandNames.SCHEDULE}"
-schedule_warning_cache = f"⚠️ Данные недели кешируются! Для получения актуального расписания необходимо запросить расписание снова /{CommandNames.WEEK}\nТакже вы можете получить расписание на сегодня /{CommandNames.TODAY}"
+schedule_warning_cache = f"⚠️ Данные недели кешируются! В случае изменения расписания необходимо запросить расписание снова /{CommandNames.WEEK}\nТакже вы можете получить расписание на сегодня /{CommandNames.TODAY} и воспользоваться кнопкой <b>Обновить</b>"
 
 week_not_found = "Неделя не найдена. Обратитесь к администратору"
 
@@ -116,7 +116,7 @@ def schedule_content(lesson: dict):
         f"| 📍 {location}\n\n"
     )
 
-def format_schedule_day(data: dict) -> str:
+def serialize_schedule_day(data: dict) -> str:
     message = ""
 
     group: str = data.get('group', '')
@@ -145,12 +145,11 @@ def format_schedule_day(data: dict) -> str:
         message += schedule_content(lesson)
 
     message += f"<i>Последнее обновление: {data.get('last_update', '')}\nПолучено: {datetime.datetime.now().time()}</i>"
-
     
     return message
     
 
-def format_schedule_weeks(data: dict, week_number=None) -> str:
+def serialize_schedule_weeks(data: dict, week_number=None) -> str:
     message = ""
 
     group: str = data.get('group', '')
@@ -196,7 +195,6 @@ def format_schedule_weeks(data: dict, week_number=None) -> str:
     message += '\n'
     message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
 
-    
-    
+
     return message
     

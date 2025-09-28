@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
 #* Core ________________________________________________________________________
+from core.data.weekdays import WeekDay
 from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings
 from core.modules.group.module import GroupModule
@@ -35,17 +36,6 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class ScheduleModule(BaseModule):
-    class WeekDay:
-        MONDAY = 0
-        TUESDAY = 1
-        WEDNESDAY = 2
-        THURSDAY = 3
-        FRIDAY = 4
-        SATURDAY = 5
-        SUNDAY = 6
-    
-
-
     def setup(self, application: Application):
         # Command
         application.add_handler(CommandHandler(CommandNames.SCHEDULE, self.schedule_handler))
@@ -58,6 +48,7 @@ class ScheduleModule(BaseModule):
         application.add_handler(CallbackQueryHandler(self.schedule_week_callback, pattern="^schedule_week#"))
 
 
+
     # * ____________________________________________________________
     # * |                    Utils                                  |
     @classmethod
@@ -67,6 +58,7 @@ class ScheduleModule(BaseModule):
         path: str,
         params: dict,
     ) -> dict:
+        log.debug(f'Отправлен запрос: {path}')
         response = session.post(
             path,
             json=params
@@ -80,9 +72,10 @@ class ScheduleModule(BaseModule):
         response_json: dict = response.json()
         
         if response_json.get('last_update'):
-            response_json['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
+            response_json['data']['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
         
-        log.debug(f'Отправлен запрос: {path}')
+        
+        # log.debug(f'Получен ответ: {response_json}')
         return response_json
     
     
@@ -91,8 +84,8 @@ class ScheduleModule(BaseModule):
     def get_schedule_query(
         group_id: int = None,
         user_data: dict = None,
-        date_start: str = datetime.today().strftime(strf_time_mask),
-        date_end: str = None,
+        date_start: datetime = datetime.today(),
+        date_end: datetime = None,
     ):  
         if user_data is None:
             user_data = {}
@@ -103,17 +96,17 @@ class ScheduleModule(BaseModule):
             group_id=str(user_data.get('selected_group', None) or group_id),
             selected_lesson_type="typical",
         )
-         
-       
+        
+    
         if date_end is not None:
             params.update(dict(
-                date_start=date_start,
-                date_end=date_end,
+                date_start=date_start.strftime(strf_time_mask),
+                date_end=date_end.strftime(strf_time_mask),
             ))
             
         else:
             params.update(dict(
-                date=date_start,
+                date=date_start.strftime(strf_time_mask),
             ))
         
         
@@ -137,10 +130,7 @@ class ScheduleModule(BaseModule):
 
         returns:
             Tuple[date, date]: Кортеж дат
-        """
-        
-        WeekDay = ScheduleModule.WeekDay
-        
+        """        
 
         if current_day.weekday() != WeekDay.MONDAY:
             prev_date = current_day - timedelta(days=1)
@@ -165,13 +155,22 @@ class ScheduleModule(BaseModule):
     def get_schedule_by_group_id(
         cls,
         session: 'requests.Session',
+
         group_id: int,
-        date_start: "str" = datetime.today().strftime(strf_time_mask),
-        date_end: "str" = None,
-        user_data: dict = None
+        
+        schedule_type: str = "day",
+        user_data: dict = None,
+        
+        date_start: datetime = datetime.today(),
+        date_end: datetime = None,
+
     ) -> dict:
         if user_data is None: user_data = {}
-
+        
+        if schedule_type == "day" and date_start.weekday() == WeekDay.SUNDAY:
+            date_start += timedelta(days=1)
+                
+                
         data = dict(
             group_id=group_id,
             date_start=date_start,
@@ -182,36 +181,48 @@ class ScheduleModule(BaseModule):
 
         request = dict(
             session=session,
-            path="schedule/day/",
+            path=f"schedule/{schedule_type}/",
             params=cls.get_schedule_query(**data),
         )
+
         
         response_data: dict = ScheduleModule.fetch_data(**request)
 
-        return response_data
+
+        return response_data.get('data', {})
     
     
     @classmethod
     def get_message_schedule(cls, data: dict, is_daily: bool = True, date: "DateType" = datetime.today()) -> dict:
         formatter = None
         serializer = None
+        additional_buttons = None
         
         
         if is_daily:
             formatter = prepare_schedule_day_data
-            serializer = messages.format_schedule_day
+            serializer = messages.serialize_schedule_day
+            
+            if date.weekday() == WeekDay.SUNDAY:
+                date += timedelta(days=1)
         else:
             formatter = prepare_schedule_weeks_data
-            serializer = messages.format_schedule_weeks
+            serializer = messages.serialize_schedule_weeks
             
 
-        prepare_data = formatter(data.get("data", {}))
+        prepare_data = formatter(data)
         message = serializer(prepare_data)
+            
         
         prev_key, next_key = cls.get_prev_next_day(date, strftime=True)
          
-        callback_data = 'schedule_day' if is_daily else 'schedule_week'
-        entity = 'День' if is_daily else 'Неделя'
+        callback_data = 'schedule_week'
+        entity = 'Неделя'
+        
+        if is_daily:
+            callback_data = 'schedule_day'
+            entity = 'День'
+            additional_buttons = [messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}')]
         
         
         return dict(
@@ -223,7 +234,7 @@ class ScheduleModule(BaseModule):
                 prev_key=prev_key,
                 next_key=next_key,
 
-                additional_buttons=[messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}')]
+                additional_buttons=additional_buttons
             )
         )
     # * |___________________________________________________________|
@@ -258,15 +269,14 @@ class ScheduleModule(BaseModule):
     @ensure_user_settings()
     async def get_schedule_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
-    
         update_message = update.message or update.callback_query.message
     
-        
+        # Проверяем наличие сессии
         if not session:
             await update_message.reply_text(messages.session_error)
             return
 
-
+        # Проверяем наличие группы
         if not context.user_data.get('selected_group', False):
             await GroupModule.ask_institute(update, context)
             return
@@ -280,41 +290,20 @@ class ScheduleModule(BaseModule):
                 today += timedelta(days=1)
                 context.user_data.update(dict(need_tomorrow=False))
                 
-            today_string = today.strftime(strf_time_mask)
-    
-    
-            request = dict(
+                
+            args = dict( 
                 session=session,
-                path="schedule/day/",
-                params=ScheduleModule.get_schedule_query(
-                    user_data=context.user_data,
-                    date_start=today_string,
-                )
+                group_id=context.user_data.get('selected_group'),
+                date_start=today,
+                user_data=context.user_data
             )
             
-            response_data: dict = ScheduleModule.fetch_data(**request)
+            
+            schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
+            message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=today)
+            
+            await update_message.reply_text(**message)
 
-            context.user_data['schedule_day_data'] = dict(
-                **prepare_schedule_day_data(response_data.get("data", {})),
-            )
-
-
-            message = messages.format_schedule_day(context.user_data['schedule_day_data'])
-            prev_key, next_key = ScheduleModule.get_prev_next_day(today, strftime=True) 
-
-
-            await update_message.reply_text(
-                text=message,
-                parse_mode='HTML',
-                reply_markup=messages.use_paginator(
-                    callback_data='schedule_day',
-                    entity='День',
-                    prev_key=prev_key,
-                    next_key=next_key,
-
-                    additional_buttons=[messages.get_refresh_button(f'schedule_day#{today_string}')]
-                )
-            )
             
         except Exception:
             traceback.print_exc()
@@ -324,6 +313,8 @@ class ScheduleModule(BaseModule):
 
     @staticmethod
     @ensure_user_settings()
+    # ! DEPRECATED
+    # ! Нужно переписать под логику как с днями
     async def get_schedule_week(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
     
@@ -349,8 +340,8 @@ class ScheduleModule(BaseModule):
                 path="schedule/weeks/",
                 params=ScheduleModule.get_schedule_query(
                     user_data=context.user_data,
-                    date_start=today.strftime(strf_time_mask),
-                    date_end=(today + timedelta(weeks=3)).strftime(strf_time_mask),
+                    date_start=today,
+                    date_end=today + timedelta(weeks=3),
                 )
             )
             
@@ -385,6 +376,7 @@ class ScheduleModule(BaseModule):
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error, parse_mode='HTML')
+    # ! END DEPRECATED
 
     # * |___________________________________________________________|
 
@@ -393,6 +385,8 @@ class ScheduleModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Callback handlers                            |
+    # ! DEPRECATED
+    # ! Нужно переписать под логику как с днями
     async def schedule_week_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         query = update.callback_query
         await query.answer()
@@ -422,6 +416,7 @@ class ScheduleModule(BaseModule):
                 
             )
         )
+    # ! ENDDEPRECATED
 
 
 
@@ -432,7 +427,7 @@ class ScheduleModule(BaseModule):
         
         query = update.callback_query
         query_data = query.data.split('#')
-        query_date = datetime.strptime(query_data[-1], "%Y-%m-%d")
+        query_date = datetime.strptime(query_data[-1], strf_time_mask)
         
         await query.answer()
 
@@ -440,44 +435,55 @@ class ScheduleModule(BaseModule):
         if not session:
             await query.edit_message_text(messages.session_error)
             return
-
-        query_date_string = query_date.strftime("%Y-%m-%d")
-        request = dict(
+        
+        args = dict( 
             session=session,
-            path="schedule/day/",
-            params=ScheduleModule.get_schedule_query(
-                user_data=context.user_data,
-                date_start=query_date_string,
-            )
+            group_id=context.user_data.get('selected_group'),
+            date_start=query_date,
+            user_data=context.user_data
         )
             
-        response_data: dict = ScheduleModule.fetch_data(**request)
+            
+        schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
+        message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
+        
+        await query.edit_message_text(**message)
+        # request = dict(
+        #     session=session,
+        #     path="schedule/day/",
+        #     params=ScheduleModule.get_schedule_query(
+        #         user_data=context.user_data,
+        #         date_start=current_date,
+        #     )
+        # )
+            
+        # response_data: dict = ScheduleModule.fetch_data(**request)
     
         
-        if not response_data:
-            await query.edit_message_text(messages.schedule_without_data)
-            return
+        # if not response_data:
+        #     await query.edit_message_text(messages.schedule_without_data)
+        #     return
         
 
-        context.user_data.update(dict(
-            schedule_day_data=dict(
-                **prepare_schedule_day_data(response_data.get("data", {})),
-            )
-        ))
+        # context.user_data.update(dict(
+        #     schedule_day_data=dict(
+        #         **prepare_schedule_day_data(response_data.get("data", {})),
+        #     )
+        # ))
         
-        message = messages.format_schedule_day(context.user_data.get('schedule_day_data'))
-        prev_key, next_key = ScheduleModule.get_prev_next_day(query_date, strftime=True)
+        # message = messages.format_schedule_day(context.user_data.get('schedule_day_data'))
+        # prev_key, next_key = ScheduleModule.get_prev_next_day(query_date, strftime=True)
         
-        await query.edit_message_text(
-            text=message,
-            parse_mode='HTML',
-            reply_markup=messages.use_paginator(
-                callback_data='schedule_day',
-                entity='День',
-                prev_key=prev_key,
-                next_key=next_key,
+        # await query.edit_message_text(
+        #     text=message,
+        #     parse_mode='HTML',
+        #     reply_markup=messages.use_paginator(
+        #         callback_data='schedule_day',
+        #         entity='День',
+        #         prev_key=prev_key,
+        #         next_key=next_key,
 
-                additional_buttons=[messages.get_refresh_button(f'schedule_day#refresh#{query_date_string}')]
-            )
-        )
+        #         additional_buttons=[messages.get_refresh_button(f'schedule_day#refresh#{query_date_string}')]
+        #     )
+        # )
     # * |___________________________________________________________|

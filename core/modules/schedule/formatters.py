@@ -11,7 +11,8 @@ def get_date_by_weekday(start_date, weekday):
     target_date = start + timedelta(days=delta)
     return target_date.strftime("%d.%m.%Y")
 
-def prepare_schedule_weeks_data(weeks: dict):
+def prepare_schedule_weeks_data(data: dict):
+    weeks = data
     prepared_weeks = {}
 
     for new_index, week_key in enumerate(weeks):
