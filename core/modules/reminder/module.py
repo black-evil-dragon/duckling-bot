@@ -155,11 +155,6 @@ class ReminderModule(BaseModule):
         
         
         # * Return
-        # await update.message.reply_text(
-        #     text=messages.success_selected_time_template(time.strftime('%H:%M')),
-        #     parse_mode='HTML',
-        #     reply_markup=self.get_reminder_markup(user_settings)
-        # )
         await self.show_reminder_info(update, context)
         return True
     # * |___________________________________________________________|
@@ -281,9 +276,9 @@ class ReminderModule(BaseModule):
             )
         )
         
-        
+
         schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
-        message = ScheduleModule.get_message_schedule(schedule, is_daily=True)
+        message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=current_date)
 
         
         return message
