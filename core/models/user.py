@@ -1,13 +1,9 @@
 from typing import Any
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Column, Integer, String, JSON
 from db.core import models
 
 
-from core.models.subscriber import Subscriber
-
-
 from utils.logger import get_logger
-import json
 
 
 log = get_logger()
@@ -23,7 +19,7 @@ class User(models.BaseModel):
 
     group_id = Column(Integer, default=None)
     subgroup_id = Column(Integer, default=None)
-    user_settings = Column(String, default=None)
+    user_settings = Column(JSON, default={})
     
 
     def __str__(self):
@@ -86,13 +82,13 @@ class User(models.BaseModel):
             if not self.user_settings:
                 return {}
 
-            return json.loads(self.user_settings)
+            return self.user_settings
         except Exception:
             log.exception('Не удалось получить настройки пользователя')
             return {}
         
     def set_user_settings(self, user_settings: dict):
-        self.user_settings = json.dumps(user_settings)
+        self.user_settings = user_settings
         self.save()
         
         

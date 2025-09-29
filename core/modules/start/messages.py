@@ -1,5 +1,3 @@
-
-
 from core.settings.commands import CommandNames
 
 

@@ -155,11 +155,12 @@ class ReminderModule(BaseModule):
         
         
         # * Return
-        await update.message.reply_text(
-            text=messages.success_selected_time_template(time.strftime('%H:%M')),
-            parse_mode='HTML',
-            reply_markup=self.get_reminder_markup(user_settings)
-        )
+        # await update.message.reply_text(
+        #     text=messages.success_selected_time_template(time.strftime('%H:%M')),
+        #     parse_mode='HTML',
+        #     reply_markup=self.get_reminder_markup(user_settings)
+        # )
+        await self.show_reminder_info(update, context)
         return True
     # * |___________________________________________________________|
 
@@ -174,10 +175,13 @@ class ReminderModule(BaseModule):
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
         user_data: dict = context.job.data
 
-        user: "User" = user_data.get('instance')
-        user_id = user.user_id
-        user_settings: dict = user.get_user_settings()
+        user_id = user_data.get('user_id')
+        user: "User" = User.objects.get(user_id=user_id)
         
+        if not user:
+            log.warning(f'Пользователь {user_id} не найден')
+        
+        user_settings: dict = user.get_user_settings()
         current_date = datetime.datetime.now().date()
         
         
@@ -188,7 +192,7 @@ class ReminderModule(BaseModule):
             )
             return
             
-    
+
         if not user_settings.get('reminder_today', True):
             current_date += datetime.timedelta(days=1)
         
@@ -271,6 +275,7 @@ class ReminderModule(BaseModule):
             group_id=user.group_id,
             date_start=current_date,
             user_data=dict(
+                user_id=user.user_id,
                 **user.get_selected_data(),
                 user_settings=user.get_user_settings(),
             )

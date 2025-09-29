@@ -13,8 +13,8 @@ log = get_logger()
 
 # * UTILS _____________________________________________________________________
 
-# Вообще странная штуковина, получилось вот так
-class ContextManage:
+# ? Вообще странная штуковина, получилось вот так
+class ContextManager:
     context: "ContextTypes.DEFAULT_TYPE"
     update: "Update"
     
@@ -117,7 +117,7 @@ def send_on_error():
     def decorator(func: Callable) -> Callable:        
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            manager = ContextManage()
+            manager = ContextManager()
             manager.set_context_from_args(args)
     
             await handle_error(manager.get_context())
@@ -136,7 +136,7 @@ def set_dialog_branch(dialog_name: str, value: bool = True, reset_attempt: bool 
         @wraps(func)
         def wrapper(*args, **kwargs):
     
-            manager = ContextManage()
+            manager = ContextManager()
             manager.set_context_from_args(args)
             
             if reset_attempt:
@@ -157,40 +157,31 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
         @wraps(func)
         async def wrapper(*args, **kwargs):
             
-            manager = ContextManage()
+            manager = ContextManager()
             manager.set_context_from_args(args)
-            
-            # log.debug(f'Run ensure_dialog_branch, attempt {manager.current_attempt()}')
-            
+                        
             # * Проверяем, активен ли диалог
             if manager.is_dialog_process(dialog_name):
                 result = await func(*args, **kwargs)
                 data = dict(
                     stop_dialog=True
                 )
-                    
+                
                 if result is not None:
                     if isinstance(result, dict):
                         data.update(**result)
     
                     if stop_after and data.get('stop_dialog', True):
-                        # log.debug('Stop dialog')
                         manager.set_dialog_process(False, dialog_name)
                         
                     manager.reset_context_attempt()
-                    
-                    # log.debug('Leave dialog branch')
-                    
+                                        
                     return result
                 
                 if result is None:
-                    # log.debug('Result is None')
                     manager.increment_context_attempt()
-                    
-                    # log.debug(f'New attempt count {manager.current_attempt()}')
-                    
+                                        
                     if manager.current_attempt() > max_attempts:
-                        # log.debug('Max try reached')
                         manager.reset_context_attempt()
                         
                         manager.set_error(dict(

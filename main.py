@@ -47,7 +47,6 @@ class Bot:
 
         # * Database
         self.setup_database(db_filename)
-        # self.app.bot_data.update({'database': Database}) # ? Это вообще нужно?
 
 
     async def post_init(self, application):

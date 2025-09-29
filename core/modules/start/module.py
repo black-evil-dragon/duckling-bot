@@ -1,6 +1,5 @@
 
 #* Telegram bot framework ________________________________________________________________________
-import asyncio
 from telegram import Update
 from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
@@ -269,11 +268,6 @@ class StartModule(BaseModule):
         # * Определение настройки
         command = query.data.split('#')[-1]
         value_type, value, setting = command.split('$')
-        
-        # * Обновление данных
-        user_settings = user.set_setting(setting, value, value_type)
-        context.user_data.update(dict(user_settings=user_settings))
-
 
 
         # * Особенности поведения
@@ -315,6 +309,10 @@ class StartModule(BaseModule):
                 
             await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
         
+        
+        # * Обновление данных
+        user_settings = user.set_setting(setting, value, value_type)
+        context.user_data.update(dict(user_settings=user_settings))
         
         
         # !КОСТЫЛЬ.. Наверное
