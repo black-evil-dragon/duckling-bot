@@ -1,68 +1,89 @@
+#
+#* Telegram bot framework ________________________________________________________________________
 from telegram.ext import  ApplicationBuilder
 
-from core.db import Database
-from core.settings import COMMANDS, setup_commands
 
+#* DB ________________________________________________________________________
+from db.core import Database
+
+
+#* Core ________________________________________________________________________
+from core.models import User, Subscriber
+from core.settings import COMMANDS, setup_commands
 from core.session import Session
+
+
+#* Other packages ________________________________________________________________________
 from utils.logger import setup_logger
+
+
+from dotenv import load_dotenv
 
 import os
 import logging
 
 
-from dotenv import load_dotenv
-load_dotenv() 
 
 
-log: 'logging.Logger' = None
+            
 
 class Bot:
 
     session_manager: 'Session' = None
-    db_manager = None
 
 
-    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = ''):
+    def __init__(self, token: str, api_id: str, api_key: str, db_filename: str = 'db.sqlite3'):
         self.token = token
 
         self.app = ApplicationBuilder().token(self.token).post_init(self.post_init).build()
 
-        #* Session
+        # * Session
         self.session_manager: 'Session' = Session(
             id=api_id,
             key=api_key,  
         )
-
         self.app.bot_data.update({'session': self.session_manager})
+        
 
-
-        #* Database
-        if db_filename:
-            self.setup_database(db_filename)
+        # * Database
+        self.setup_database(db_filename)
 
 
     async def post_init(self, application):
         await setup_commands(application, COMMANDS)
+
             
 
     # * ____________________________________________________________
     # * |                       Setups                              |
     def setup_modules(self, modules_config):
         modules_config(self.app)
-        log.info("Модули установлены")
+        # log.info("+ Модули установлены")
 
 
     def setup_database(self, filename):
         try:
-            if not os.path.exists(filename): raise FileNotFoundError(f"Файл {filename} не найден")
+            log.info('Подключение к базе данных')
+            if not os.path.exists(filename):
+                log.error(f'| Файл {filename} не найден!')
+                
+                open(filename, 'w').close()
+                log.info(f'| Создан новый файл базы данных: {filename}')
             
-            self.db_manager = Database(filename=filename)
-            self.app.bot_data.update({'db': self.db_manager})
+        
+            # Init db
+            Database.init(url=f'sqlite:///{filename}')
 
-            log.info(f'База данных успешно подключена к файлу: {filename}')
+            # Create tables
+            User.create_all()
+            Subscriber.create_all()
+
+
+
+            log.info(f'+ База данных успешно подключена к файлу: {filename}')
 
         except Exception as e:
-            log.error(f'Не удалось загрузить базу данных: {e}')
+            log.error(f'+ Не удалось загрузить базу данных: {e}')
 
     # * |___________________________________________________________|
 
@@ -78,8 +99,8 @@ class Bot:
 
 def main():
     try:
-        from utils.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
-
+        from core.settings.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
+        
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
@@ -92,23 +113,28 @@ def main():
         # * Подключаем модули и запускаем ----------------------------------------
         try:
             from core.modules import setup_modules
+            
+
             bot.setup_modules(setup_modules)
             
             bot.run()
 
         except Exception as error:
-            return log.error(f'Не удалось загрузить модули: {str(error)}')
+            return log.exception(f'Не удалось загрузить модули: {str(error)}')
         
 
     except ImportError:
         log.error('Не найден файл конфигурации [./utils/config.py].')
         log.error('| - Создайте файл конфигурации на основе [./utils/config.template.py]')
-        return 
+        return
     
     
 
 
 if __name__ == "__main__":
+    load_dotenv() 
+
+    log: 'logging.Logger' = None
     log = setup_logger()
 
     main()

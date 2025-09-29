@@ -2,68 +2,81 @@
 
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import Update
-from telegram.ext import Application, ContextTypes
+from telegram import InlineKeyboardButton
+from telegram.ext import Application
 
 
 #* Core ________________________________________________________________________
+from core.modules.base.decorators import ensure_user_settings
 from core.settings import COMMANDS
 
 
 #* Other packages ________________________________________________________________________
-from functools import wraps
-from typing import Callable
+from core.settings.commands import CommandNames
 
 
+strf_time_mask = "%Y-%m-%d"
 
 
+# !DEPRECATED
 class BaseMessages:
     # * TEXT ___________________________________________________________________
 
     help_text = '\n'.join((
         f'/{command} - {description}' for command, description in COMMANDS
     ))
+    
+    
+    attempts_error_message = f"Максимальное количество попыток, похоже, что что-то пошло не так.\nПопробуйте еще раз или сообщите об этом разработчику\n\n/{CommandNames.HELP}"
 
     # * TEMPLATES ___________________________________________________________________
-
+# !END DEPRECATED
 
 
 
 # * MODULE ___________________________________________________________________
 class BaseModule:
+
     def __init__(self) -> None:
         pass
+    
+    def __repr__(self):
+        return f"<class {self.__class__.__name__}>"
+    
+    def __str__(self):
+        return f"<{self.__class__.__name__}>"
 
     def setup(self, application: 'Application') -> None:
         raise Exception('Функция не переопределена')
+
+    
     
     
     # * ____________________________________________________________
-    # * |               Decorators and utils                         |
+    # * |                       Utils                               |
+
+    # ? Well
     @staticmethod
-    def set_command_process(is_run: bool, context: 'ContextTypes.DEFAULT_TYPE'):
-        context.user_data.update(dict(
-            is_command_process=is_run
-        ))
-        return context
+    @ensure_user_settings()
+    async def update_user_settings(*args, **kwargs):
+        pass
     
+    # * |___________________________________________________________|
+    
+    
+    
+    # * ____________________________________________________________
+    # * |                        UI                                 |
+    # * | Buttons
+    menu_button = InlineKeyboardButton("📍 Меню", callback_data="delegate#menu")
 
     @staticmethod
-    def command_process(is_run: bool):
-        def decorator(func: Callable) -> Callable:
-            @wraps(func)
-            async def wrapper(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', **kwargs):
-
-                context = BaseModule.set_command_process(is_run, context)
-                
-                return await func(update, context, **kwargs)
-            
-            return wrapper
-        return decorator
+    def delegate_button_template(text, command):
+        return InlineKeyboardButton(text=text, callback_data=f"delegate#{command}")
     # * |___________________________________________________________|
 
 
-    
+    # COMMENT TEMPLATES
     
 
     # * ____________________________________________________________
@@ -75,7 +88,7 @@ class BaseModule:
 
     # * ____________________________________________________________
     # * |               Message handlers                            |
-    # ...
+    
     # * |___________________________________________________________|
 
 
