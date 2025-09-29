@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict
 
 def get_date_by_weekday(start_date, weekday):
     start = datetime.strptime(start_date, "%Y-%m-%d")
@@ -11,13 +11,17 @@ def get_date_by_weekday(start_date, weekday):
     target_date = start + timedelta(days=delta)
     return target_date.strftime("%d.%m.%Y")
 
-def prepare_schedule_weeks_data(weeks: dict):
+def prepare_schedule_weeks_data(data: dict):
+    weeks = data
+
     prepared_weeks = {}
 
     for new_index, week_key in enumerate(weeks):
         week_data = weeks[week_key]
-        
+                
         # Сортируем занятия внутри каждого дня по полю 'order'
+        if 'days' not in week_data: continue
+
         for day_key in week_data['days']:
             lessons = week_data['days'][day_key]
             lessons.sort(key=lambda lesson: lesson.get('order', 0))

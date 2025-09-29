@@ -1,22 +1,33 @@
-from datetime import datetime
-
 from logging.handlers import RotatingFileHandler
+from dotenv import dotenv_values
+
 import logging
 
+
+config: dict = dotenv_values(".env")
 
 
 def setup_logger(max_log_size=10 * 1024 * 1024, backup_count=5):
     """
     Настройка логгера с ротацией логов по размеру.
-    
+
     Args:
         max_log_size (int): Максимальный размер файла в байтах (по умолчанию 10 МБ).
         backup_count (int): Сколько старых логов хранить (по умолчанию 5).
     """
-    logger = logging.getLogger("duckling")
-    logger.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s]  %(message)s")
+    logger = logging.getLogger("duckling")
+
+    level = logging.INFO
+    if config.get("DEBUG", '0') == '1':
+        level = logging.DEBUG
+        logger.warning("Установлен режим отладки!")
+
+    logger.setLevel(level)
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)-5s] [%(module)-15s:%(funcName)-20s] %(message)s"
+    )
 
     # Логирование в консоль
     console_handler = logging.StreamHandler()
@@ -40,5 +51,11 @@ def setup_logger(max_log_size=10 * 1024 * 1024, backup_count=5):
 def get_logger():
     """Получение уже настроенного логгера."""
     logger = logging.getLogger("duckling")
-    logger.setLevel(logging.DEBUG)
+    level = logging.INFO
+
+    if config.get("DEBUG", '0') == '1':
+        level = logging.DEBUG
+
+    logger.setLevel(level)
+
     return logger
