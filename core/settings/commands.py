@@ -15,7 +15,7 @@ class CommandNames(TextChoices):
     SET_GROUP = "group", "Установить группу"
     SET_SUBGROUP = "subgroup", "Установить подгруппу"
     
-    SET_REMINDER = "reminder", "Установить время рассылки"
+    SET_REMINDER = "setreminder", "Установить время рассылки"
     SHOW_REMINDER = "myreminder", "Моя рассылка"
     
     SCHEDULE = "schedule", "Расписание"
