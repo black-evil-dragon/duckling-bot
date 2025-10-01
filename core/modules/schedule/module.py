@@ -198,6 +198,11 @@ class ScheduleModule(BaseModule):
         serializer = None
         additional_buttons = None
         
+        template_manager = messages.TemplateManager()
+        template = template_manager.get_template()
+        
+
+        
         
         if is_daily:
             formatter = prepare_schedule_day_data
@@ -212,6 +217,8 @@ class ScheduleModule(BaseModule):
 
         prepare_data = formatter(data)
         message = serializer(prepare_data)
+        
+        log.debug(template.get_message(prepare_data))
             
         
         prev_key, next_key = cls.get_prev_next_day(date, strftime=True)
@@ -453,42 +460,5 @@ class ScheduleModule(BaseModule):
         message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
         
         await query.edit_message_text(**message)
-        # request = dict(
-        #     session=session,
-        #     path="schedule/day/",
-        #     params=ScheduleModule.get_schedule_query(
-        #         user_data=context.user_data,
-        #         date_start=current_date,
-        #     )
-        # )
-            
-        # response_data: dict = ScheduleModule.fetch_data(**request)
-    
-        
-        # if not response_data:
-        #     await query.edit_message_text(messages.schedule_without_data)
-        #     return
-        
 
-        # context.user_data.update(dict(
-        #     schedule_day_data=dict(
-        #         **prepare_schedule_day_data(response_data.get("data", {})),
-        #     )
-        # ))
-        
-        # message = messages.format_schedule_day(context.user_data.get('schedule_day_data'))
-        # prev_key, next_key = ScheduleModule.get_prev_next_day(query_date, strftime=True)
-        
-        # await query.edit_message_text(
-        #     text=message,
-        #     parse_mode='HTML',
-        #     reply_markup=messages.use_paginator(
-        #         callback_data='schedule_day',
-        #         entity='День',
-        #         prev_key=prev_key,
-        #         next_key=next_key,
-
-        #         additional_buttons=[messages.get_refresh_button(f'schedule_day#refresh#{query_date_string}')]
-        #     )
-        # )
     # * |___________________________________________________________|
