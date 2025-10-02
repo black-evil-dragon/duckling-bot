@@ -36,6 +36,10 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class ScheduleModule(BaseModule):
+    
+    template_manager = messages.TemplateManager()
+    
+    
     def setup(self, application: Application):
         # Command
         application.add_handler(CommandHandler(CommandNames.SCHEDULE, self.schedule_handler))
@@ -198,12 +202,9 @@ class ScheduleModule(BaseModule):
         serializer = None
         additional_buttons = None
         
-        template_manager = messages.TemplateManager()
-        template = template_manager.get_template()
+        template = cls.template_manager.get_template('compact')
         
 
-        
-        
         if is_daily:
             formatter = prepare_schedule_day_data
             serializer = messages.serialize_schedule_day
@@ -216,9 +217,9 @@ class ScheduleModule(BaseModule):
             
 
         prepare_data = formatter(data)
-        message = serializer(prepare_data)
+        # message = serializer(prepare_data)
         
-        log.debug(template.get_message(prepare_data))
+        message = template.get_message(prepare_data)
             
         
         prev_key, next_key = cls.get_prev_next_day(date, strftime=True)
@@ -318,11 +319,11 @@ class ScheduleModule(BaseModule):
         
 
 
-    @staticmethod
+    @classmethod
     @ensure_user_settings()
     # ! DEPRECATED
     # ! Нужно переписать под логику как с днями
-    async def get_schedule_week(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def get_schedule_week(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
     
         update_message = update.message or update.callback_query.message
@@ -362,7 +363,10 @@ class ScheduleModule(BaseModule):
             )
             context.user_data['schedule_weeks_data'] = schedule
             
-            message = messages.serialize_schedule_weeks(schedule, 0)
+            
+            template = cls.template_manager.get_template('compact')
+            # message = messages.serialize_schedule_weeks(schedule, 0)
+            message = template.get_message(schedule, 'weeks', 0)
             next_key = None if not len(schedule['data']) - 1 else 1
 
             await update_message.reply_text(
@@ -407,7 +411,9 @@ class ScheduleModule(BaseModule):
             await query.edit_message_text(messages.schedule_without_data)
             return
         
-        message = messages.serialize_schedule_weeks(data, week_idx)
+        # message = messages.serialize_schedule_weeks(data, week_idx)
+        template = self.template_manager.get_template('compact')
+        message = template.get_message(data, 'weeks', week_idx)
         
         prev_key = None if week_idx == 0 else week_idx - 1
         next_key = None if week_idx == len(data['data']) - 1 else week_idx + 1

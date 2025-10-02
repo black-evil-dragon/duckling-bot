@@ -2,8 +2,13 @@ from typing import Literal, overload
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from core.data.weekdays import WEEKDAYS
+from core.modules.schedule.templates.compact import CompactTemplate
 from core.settings.commands import CommandNames
+
 from core.modules.schedule.formatters import get_date_by_weekday
+from core.modules.schedule.templates.base import BaseTemplate
+from core.modules.schedule.templates.default import DefaultTemplate
+
 from utils.logger import get_logger
 
 import datetime
@@ -75,185 +80,10 @@ server_error = "Произошла ошибка при запросе к сер�
 
 
 # * TEMPLATES ___________________________________________________________________
-
-
-# * Base template
-#  Базовый класс с методами для формирования сообщений
-class BaseTemplate:    
-    WEEKDAYS = {
-        '1': 'Понедельник', '2': 'Вторник', '3': 'Среда',
-        '4': 'Четверг', '5': 'Пятница', '6': 'Суббота', '7': 'Воскресенье'
-    }
-    
-    
-    def get_message(self, *args, **kwargs):
-        raise NotImplementedError('Метод get_message должен быть реализован в классе-наследнике')
-    
-    
-    def schedule_title(self, title: str) -> str:
-        return f"<b>📅 Расписание группы {title}</b>"
-    
-    def week_info(self, week_type: str, first_date: str, last_date: str = None) -> str:
-        first_date = datetime.datetime.strptime(first_date, "%Y-%m-%d").strftime("%d.%m.%Y")
-
-        if last_date is not None:
-            last_date = datetime.datetime.strptime(last_date, "%Y-%m-%d").strftime("%d.%m.%Y")
-            return f"<b>| {week_type} | {first_date} - {last_date} |</b>"
-        
-        return f"<b>| {week_type} | {first_date} |</b>"
-    
-    def get_weekday_name(self, week_day: str) -> str:
-        return self.WEEKDAYS.get(str(week_day), "EMPTY")
-    
-    def get_short_lesson_type(self, lesson_type: str) -> str:
-        lesson_type = lesson_type.replace(' ', '').lower()
-        short_lesson_types = {
-            'лекция': 'ЛЕК',
-            'практика': 'ПРА', 
-            'лабораторная': 'ЛАБ',
-            'семинар': 'СЕМ',
-            'экзамен': 'ЭКЗ',
-            'зачет': 'ЗАЧ',
-            'диф.зачет': 'ДЗАЧ',
-            'консультация': 'КОНС',
-        }
-        return short_lesson_types.get(lesson_type, lesson_type)
-    
-
-
-# * Default template
-class DefaultTemplate(BaseTemplate):
-    # 📅 Расписание группы 4Б09 РПС-31
-    # | Чётная | 01.10.2025 |
-
-    # Среда
-    # * 🕒 09:40 - 11:10  
-    # | 📚 Основы теории управления
-    # | 🎯 Лекция
-    # | 👨‍🏫 доц., Сергушичева Анна Павловна
-    # | 📍 к. 4, ауд. 2а
-
-    # * 🕒 11:40 - 13:10  
-    # | 📚 Основы программно-информационных систем
-    # | 🎯 Лекция
-    # | 👨‍🏫 ст.пр., Ковырзина Татьяна Федоровна
-    # | 📍 к. 2, ауд. 227/3
-
-    # Последнее обновление: 30.09.2025 15:54:20
-    # Получено: 19:17:09.294201
-
-    def format_lesson(self, lesson: dict) -> str:
-        title = lesson.get('title', '')
-        time = lesson.get('time', '')
-        teacher = lesson.get('teacher', '')
-        lesson_type = lesson.get('type', '')
-        location = lesson.get('location', '')
-        subgroup = lesson.get('subgroup', ' ') or ' '
-        
-        # Упрощаем локацию для дистанта
-        if 'Дистант' in location:
-            location = 'Дистант'
-            
-        return (
-            f"* 🕒 <b>{time} {subgroup}</b>\n"
-            f"| 📚 {title}\n"
-            f"| 🎯 {lesson_type}\n"
-            f"| 👨‍🏫 {teacher}\n"
-            f"| 📍 {location}\n\n"
-        )
-        
-        
-    def get_message(self, data: dict, data_type: str = 'day') -> str:
-        message_managers = {
-            'day': self.format_schedule_day,
-            'weeks': self.format_schedule_weeks
-        }
-        
-        return message_managers[data_type](data)
-           
-    
-    def format_schedule_day(self, data: dict) -> str:
-        message = ""
-        group = data.get('group', '')
-        date = data.get('date', '')
-        week_number = data.get('week_number', 0)
-        week_day = data.get('week_day', '')
-        lessons = data.get('lessons', [])
-        
-        week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
-        weekday_name = self.get_weekday_name(week_day)
-
-        message += self.schedule_title(group)
-        message += '\n'
-        message += self.week_info(week_odd_even, date)
-        message += '\n\n'
-        message += f"<b>{weekday_name}</b>\n"
-
-        if not lessons:
-            message += "❌ Занятий нет\n\n"
-        else:
-            for lesson in lessons:
-                message += self.format_lesson(lesson)
-
-        message += f"<i>Последнее обновление: {data.get('last_update', '')}\n"
-        message += f"Получено: {datetime.datetime.now().time()}</i>"
-        
-        return message
-    
-    def format_schedule_weeks(self, data: dict, week_number: int = None) -> str:
-        message = ""
-        group = data.get('group', '')
-        weeks = data.get('data', {})
-        
-        if not weeks:
-            return "Расписание не найдено"
-        
-        if week_number is None:
-            week_number = list(weeks.keys())[0]
-        
-        week = weeks.get(week_number)
-        if not week:
-            return "Неделя не найдена"
-        
-        week_odd_even = "Нечётная" if week['is_odd'] else "Чётная"
-
-        message += self.schedule_title(group)
-        message += '\n'
-        message += self.week_info(week_odd_even, week.get('date_start'), week.get('date_end'))
-        message += '\n\n'
-
-        for day_key in week.get('days', {}):
-            lessons = week['days'][day_key]
-            weekday_date = self.get_date_by_weekday(week.get('date_start'), int(day_key))
-            weekday_name = self.get_weekday_name(day_key)
-
-            message += f"<b>{weekday_name} ({weekday_date})</b>\n"
-
-            if not lessons:
-                message += "❌ Занятий нет\n\n"
-                continue
-
-            for lesson in lessons:
-                message += self.format_lesson(lesson)
-
-        message += self.week_info(week_odd_even, week.get('date_start'), week.get('date_end'))
-        message += '\n'
-        message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
-
-        return message
-    
-    def get_date_by_weekday(self, start_date: str, weekday: int) -> str:
-        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-        target_date = start + datetime.timedelta(days=weekday-1)
-        return target_date.strftime("%d.%m.%Y")
-    
-    
-    
-    
 class TemplateManager:
     TEMPLATES = {
         'default': DefaultTemplate,
-        # 'short': ShortTemplate, 
+        'compact': CompactTemplate, 
         # 'minimal': MinimalTemplate,
     }
     
@@ -264,8 +94,8 @@ class TemplateManager:
     # @overload
     # def get_template(self, name: Literal['short']) -> ShortTemplate: ...
     
-    # @overload
-    # def get_template(self, name: Literal['minimal']) -> MinimalTemplate: ...
+    @overload
+    def get_template(self, name: Literal['compact']) -> CompactTemplate: ...
     
     @overload
     def get_template(self, name: Literal['default']) -> DefaultTemplate: ...
