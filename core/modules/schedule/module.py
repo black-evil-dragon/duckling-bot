@@ -1,6 +1,8 @@
 
 #* Telegram bot framework ________________________________________________________________________
+import asyncio
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
 
 #* Core ________________________________________________________________________
@@ -12,7 +14,7 @@ from core.modules.group.module import GroupModule
 from core.session import Session
 from core.settings.commands import CommandNames
 
-from .formatters import prepare_schedule_weeks_data, prepare_schedule_day_data
+from .formatters import prepare_schedule_weeks_data, prepare_schedule_day_data, split_message
 
 from . import messages
 
@@ -358,6 +360,7 @@ class ScheduleModule(BaseModule):
             message = messages.serialize_schedule_weeks(schedule, 0)
             next_key = None if not len(schedule['data']) - 1 else 1
 
+        
             await update_message.reply_text(
                 text=message,
                 parse_mode='HTML',
@@ -369,14 +372,45 @@ class ScheduleModule(BaseModule):
                 )
             )
             
+            
             await update_message.reply_text(
                 text=messages.schedule_warning_cache,
                 parse_mode='HTML'
             )
             
+        except BadRequest as exception:
+            # Возможно, Message_too_long
+            if "Message_too_long" in str(exception):
+                parts = split_message(message, 4000)
+                
+                for i, part in enumerate(parts, 1):
+                    part_with_progress = f"({i}/{len(parts)})\n\n{part}"
+                    
+                    if i == len(parts):
+                        await update_message.reply_text(
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                            reply_markup=messages.use_paginator(
+                                callback_data='schedule_week',
+                                entity='Неделя',
+
+                                next_key=next_key,
+                            )
+                        )
+                    else:
+                        await update_message.reply_text(
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                        )
+                        await asyncio.sleep(.5)
+                        
+            else:
+                raise exception
+            
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error, parse_mode='HTML')
+
     # ! END DEPRECATED
 
     # * |___________________________________________________________|
@@ -405,18 +439,55 @@ class ScheduleModule(BaseModule):
         prev_key = None if week_idx == 0 else week_idx - 1
         next_key = None if week_idx == len(data['data']) - 1 else week_idx + 1
         
-        
-        await query.edit_message_text(
-            text=message,
-            parse_mode='HTML',
-            reply_markup=messages.use_paginator(
-                callback_data='schedule_week',
-                entity='Неделя',
-                prev_key=prev_key,
-                next_key=next_key,
-                
+        try:
+            await query.edit_message_text(
+                text=message,
+                parse_mode='HTML',
+                reply_markup=messages.use_paginator(
+                    callback_data='schedule_week',
+                    entity='Неделя',
+                    prev_key=prev_key,
+                    next_key=next_key,
+                    
+                )
             )
-        )
+
+        except BadRequest as exception:
+            # Возможно, Message_too_long
+            if "Message_too_long" in str(exception):
+                parts = split_message(message, 4000)
+                user_id = context.user_data.get('user_id')
+                
+                for i, part in enumerate(parts, 1):
+                    part_with_progress = f"({i}/{len(parts)})\n\n{part}"
+                    
+                    if i == len(parts):
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                            reply_markup=messages.use_paginator(
+                                callback_data='schedule_week',
+                                entity='Неделя',
+
+                                next_key=next_key,
+                            )
+                        )
+                    else:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                        )
+                        await asyncio.sleep(.5)
+                        
+            else:
+                raise exception
+            
+        except Exception:
+            traceback.print_exc()
+            await query.edit_message_text(messages.server_error, parse_mode='HTML')
+
     # ! ENDDEPRECATED
 
 
@@ -453,42 +524,5 @@ class ScheduleModule(BaseModule):
         message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
         
         await query.edit_message_text(**message)
-        # request = dict(
-        #     session=session,
-        #     path="schedule/day/",
-        #     params=ScheduleModule.get_schedule_query(
-        #         user_data=context.user_data,
-        #         date_start=current_date,
-        #     )
-        # )
-            
-        # response_data: dict = ScheduleModule.fetch_data(**request)
-    
-        
-        # if not response_data:
-        #     await query.edit_message_text(messages.schedule_without_data)
-        #     return
-        
 
-        # context.user_data.update(dict(
-        #     schedule_day_data=dict(
-        #         **prepare_schedule_day_data(response_data.get("data", {})),
-        #     )
-        # ))
-        
-        # message = messages.format_schedule_day(context.user_data.get('schedule_day_data'))
-        # prev_key, next_key = ScheduleModule.get_prev_next_day(query_date, strftime=True)
-        
-        # await query.edit_message_text(
-        #     text=message,
-        #     parse_mode='HTML',
-        #     reply_markup=messages.use_paginator(
-        #         callback_data='schedule_day',
-        #         entity='День',
-        #         prev_key=prev_key,
-        #         next_key=next_key,
-
-        #         additional_buttons=[messages.get_refresh_button(f'schedule_day#refresh#{query_date_string}')]
-        #     )
-        # )
     # * |___________________________________________________________|
