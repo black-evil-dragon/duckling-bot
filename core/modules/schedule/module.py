@@ -249,7 +249,7 @@ class ScheduleModule(BaseModule):
     @ensure_user_settings()
     async def schedule_handler(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
 
-        schedule_week = context.user_data.get('user_settings', {}).get('show_week', True)
+        schedule_week = context.user_data.get('user_settings', {}).get('show_week', False)
 
         if schedule_week:
             await ScheduleModule.get_schedule_week(update, context)

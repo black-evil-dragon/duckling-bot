@@ -74,6 +74,7 @@ class StartModule(BaseModule):
         # Получаем номер недели из callback_data
         command = str(query.data.split('#')[-1])
         
+        # ! КОСТЫЛЬ 
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
         }
@@ -130,13 +131,14 @@ class StartModule(BaseModule):
     def get_menu_commands(cls, context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
 
+        # ! КОСТЫЛЬ - название команд отличается от CommandNames
         MENU_COMMANDS = (
             (None, None, None),
             ("help", "Помощь", cls.help),
             (None, None, None),
 
             ("schedule", "Расписание", ScheduleModule.schedule_handler),
-            ("today", "На сегодня", ScheduleModule.get_schedule_day) if user_settings.get('show_week', True) else ("week", "На неделю", ScheduleModule.get_schedule_week),
+            ("today", "На сегодня", ScheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", ScheduleModule.get_schedule_week),
             ("tomorrow", "На завтра", ScheduleModule.get_schedule_next_day),
 
             ("set_group", "Установить группу", GroupModule.ask_institute),
@@ -185,13 +187,13 @@ class StartModule(BaseModule):
 
             # Связанные настройки, если включен один, другой выключить
             (
-                f"settings#bool${not user_settings.get('show_week', True)}$show_week",
-                f"П.у неделя {'✅' if user_settings.get('show_week', True) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
+                f"П.у неделя {'✅' if user_settings.get('show_week', False) else '❌'}",
             ),
             None,
             (
-                f"settings#bool${not user_settings.get('show_week', True)}$show_week",
-                f"П.у день {'✅' if not user_settings.get('show_week', True) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
+                f"П.у день {'✅' if not user_settings.get('show_week', False) else '❌'}",
             ),
 
 
