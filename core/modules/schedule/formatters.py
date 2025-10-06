@@ -11,13 +11,17 @@ def get_date_by_weekday(start_date, weekday):
     target_date = start + timedelta(days=delta)
     return target_date.strftime("%d.%m.%Y")
 
-def prepare_schedule_weeks_data(weeks: dict):
+def prepare_schedule_weeks_data(data: dict):
+    weeks = data
+
     prepared_weeks = {}
 
     for new_index, week_key in enumerate(weeks):
         week_data = weeks[week_key]
-        
+                
         # Сортируем занятия внутри каждого дня по полю 'order'
+        if 'days' not in week_data: continue
+
         for day_key in week_data['days']:
             lessons = week_data['days'][day_key]
             lessons.sort(key=lambda lesson: lesson.get('order', 0))
@@ -34,3 +38,29 @@ def prepare_schedule_day_data(data: Dict):
 
     return data
 
+
+def split_message(text: str, max_length=4096) -> List[str]:
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    while text:
+        if len(text) <= max_length:
+            parts.append(text)
+            break
+        
+        # Ищем последний перенос строки в пределах лимита
+        split_pos = text.rfind('\n', 0, max_length)
+        
+        # Если переноса строки нет, ищем последний пробел
+        if split_pos == -1:
+            split_pos = text.rfind(' ', 0, max_length)
+        
+        # Если и пробела нет, просто обрезаем по max_length
+        if split_pos == -1:
+            split_pos = max_length
+        
+        parts.append(text[:split_pos])
+        text = text[split_pos:].lstrip()
+    
+    return parts

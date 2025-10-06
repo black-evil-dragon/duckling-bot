@@ -1,14 +1,24 @@
-import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from core.data.weekdays import WEEKDAYS
+from core.settings.commands import CommandNames
 from core.modules.schedule.formatters import get_date_by_weekday
+from utils.logger import get_logger
 
+import datetime
+
+
+log = get_logger()
 
 
 
 # * KEYBOARDS ___________________________________________________________________
 def create_pagination_keyboard(callback_data: str, current_page: int, total_pages: int, entity='страница') -> 'InlineKeyboardMarkup':
+    """
+    Устаревшая функция
+    """
+    log.warning('[func - create_pagination_keyboard]: This method is deprecated. Use use_paginator instead')
+
     keyboard = []
 
     if current_page > 0:
@@ -21,33 +31,44 @@ def create_pagination_keyboard(callback_data: str, current_page: int, total_page
     return InlineKeyboardMarkup([keyboard])
 
 
-def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница') -> 'InlineKeyboardMarkup':
+
+def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None, entity='Страница', additional_buttons: list = None) -> 'InlineKeyboardMarkup':
     """
     Более улучшеная функция
     """
     keyboard = []
 
     if prev_key is not None:
-        keyboard.append(InlineKeyboardButton(f"⬅️ {entity}", callback_data=f"{callback_data}_{prev_key}"))
+        keyboard.append(InlineKeyboardButton(f"⬅️ {entity}", callback_data=f"{callback_data}#{prev_key}"))
     
     keyboard.append(InlineKeyboardButton("📍 Меню", callback_data="delegate#menu"))
 
     if next_key is not None:
-        keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}_{next_key}"))
+        keyboard.append(InlineKeyboardButton(f"{entity} ➡️", callback_data=f"{callback_data}#{next_key}"))
     
-    return InlineKeyboardMarkup([keyboard])
+    return InlineKeyboardMarkup([
+        keyboard,
+        additional_buttons if additional_buttons is not None else [],
+    ])
+
+
+def get_refresh_button(callback_data: str) -> 'InlineKeyboardButton':
+    return InlineKeyboardButton("🔄 Обновить", callback_data=callback_data)
 
 
 
 # * TEXT ___________________________________________________________________
 
 schedule_not_found = "Расписание пустое"
-week_not_found = "Неделя не найдена. Обратитесь к администратору"
+schedule_without_data = f"Данные расписания отсутствуют. Запросите расписание снова /{CommandNames.SCHEDULE}"
+schedule_warning_cache = f"⚠️ Данные недели кешируются! В случае изменения расписания необходимо запросить расписание снова /{CommandNames.WEEK}\nТакже вы можете получить расписание на сегодня /{CommandNames.TODAY} и воспользоваться кнопкой <b>Обновить</b>"
 
-schedule_wihtout_data = "Данные расписания отсутствуют. Запросите расписание снова /schedule"
+week_not_found = "Неделя не найдена. Обратитесь к администратору"
 
 
 session_error = "Произошла ошибка при установке сессии\n\nПопробуйте снова позже"
+
+
 server_error = "Произошла ошибка при запросе к серверу\n\nПопробуйте снова позже"
 
 
@@ -95,7 +116,7 @@ def schedule_content(lesson: dict):
         f"| 📍 {location}\n\n"
     )
 
-def format_schedule_day(data: dict) -> str:
+def serialize_schedule_day(data: dict) -> str:
     message = ""
 
     group: str = data.get('group', '')
@@ -104,11 +125,8 @@ def format_schedule_day(data: dict) -> str:
     week_day = data.get('week_day', '')
     lessons: list = data.get('lessons', [])
 
-    # print(data)
-
 
     week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
-    weekday_date = get_date_by_weekday(date, int(week_day))
     weekday_name = WEEKDAYS.get(str(week_day), "EMPTY")
 
     message += schedule_title(group)
@@ -126,13 +144,12 @@ def format_schedule_day(data: dict) -> str:
     for lesson in lessons:
         message += schedule_content(lesson)
 
-    message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
-
+    message += f"<i>Последнее обновление: {data.get('last_update', '')}\nПолучено: {datetime.datetime.now().time()}</i>"
     
     return message
     
 
-def format_schedule_weeks(data: dict, week_number=None) -> str:
+def serialize_schedule_weeks(data: dict, week_number=None) -> str:
     message = ""
 
     group: str = data.get('group', '')
@@ -178,7 +195,6 @@ def format_schedule_weeks(data: dict, week_number=None) -> str:
     message += '\n'
     message += f"<i>Последнее обновление: {data.get('last_update', '')}</i>"
 
-    
-    
+
     return message
     
