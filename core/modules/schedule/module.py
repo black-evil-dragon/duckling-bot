@@ -1,9 +1,8 @@
 
 #* Telegram bot framework ________________________________________________________________________
-import asyncio
 from telegram import Update
-from telegram.error import BadRequest
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
+import telegram
 
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
@@ -25,7 +24,7 @@ from datetime import date as DateType
 from typing import Tuple
 from utils.logger import get_logger
 
-
+import asyncio
 import traceback
 import requests
 
@@ -60,7 +59,7 @@ class ScheduleModule(BaseModule):
         path: str,
         params: dict,
     ) -> dict:
-        log.debug(f'Отправлен запрос: {path}')
+        # log.debug(f'Отправлен запрос: {path}')
         response = session.post(
             path,
             json=params
@@ -378,7 +377,7 @@ class ScheduleModule(BaseModule):
                 parse_mode='HTML'
             )
             
-        except BadRequest as exception:
+        except telegram.error.BadRequest as exception:
             # Возможно, Message_too_long
             if "Message_too_long" in str(exception):
                 parts = split_message(message, 4000)
@@ -452,7 +451,7 @@ class ScheduleModule(BaseModule):
                 )
             )
 
-        except BadRequest as exception:
+        except telegram.error.BadRequest as exception:
             # Возможно, Message_too_long
             if "Message_too_long" in str(exception):
                 parts = split_message(message, 4000)
@@ -522,7 +521,24 @@ class ScheduleModule(BaseModule):
             
         schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
         message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
-        
-        await query.edit_message_text(**message)
+
+        try:
+            await query.edit_message_text(**message)
+
+        except telegram.error.BadRequest as exception:
+            if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
+                log.error(f'Ошибка отправки сообщения [{exception.message}]')
+                log.warning('Пробуем отправить еще раз!')
+                
+                await context.bot.send_message(
+                    chat_id=context.user_data.get('user_id'),
+                    **message
+                )
+                return
+            
+            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
+            
+        except Exception as exception:
+            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
 
     # * |___________________________________________________________|
