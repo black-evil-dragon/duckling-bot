@@ -378,8 +378,12 @@ class ScheduleModule(BaseModule):
             )
             
         except telegram.error.BadRequest as exception:
-            # Возможно, Message_too_long
-            if "Message_too_long" in str(exception):
+            # Возможно, Message is too long
+            if (
+                "Message is too long" in str(exception)
+                or 
+                "Message_too_long" in str(exception)
+            ):
                 parts = split_message(message, 4000)
                 
                 for i, part in enumerate(parts, 1):
@@ -452,8 +456,13 @@ class ScheduleModule(BaseModule):
             )
 
         except telegram.error.BadRequest as exception:
-            # Возможно, Message_too_long
-            if "Message_too_long" in str(exception):
+            # Возможно, Message is too long
+            # ! В данном случае "Message_too_long"
+            if (
+                "Message is too long" in str(exception)
+                or 
+                "Message_too_long" in str(exception)
+            ):
                 parts = split_message(message, 4000)
                 user_id = context.user_data.get('user_id')
                 
