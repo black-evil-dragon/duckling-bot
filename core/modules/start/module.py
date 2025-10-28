@@ -113,7 +113,9 @@ class StartModule(BaseModule):
     @classmethod
     async def start(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         await update.message.reply_text(
-            start_text
+            start_text,
+            parse_mode='HTML',
+            disable_web_page_preview=True,
         )
 
         await cls.show_command_keyboard(update, context)
