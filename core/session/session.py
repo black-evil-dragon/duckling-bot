@@ -49,7 +49,28 @@ class Session:
 
 
             self.get_all_groups()
+            
+            # * Tests
 
+
+            print(self.session.post('http://127.0.0.1:8000/api/schedule/period/', json=dict(
+                group_id=233,
+                date='2026-01-10',
+                date_end="2026-01-17"
+            )).json())
+            print()
+
+            print(self.session.post('http://127.0.0.1:8000/api/schedule/day/', json=dict(
+                group_id=233,
+                date='2026-01-10'
+            )).json())
+            print()
+            print(self.session.post('http://127.0.0.1:8000/api/schedule/weeks/', json=dict(
+                group_id=233,
+                date_start='2026-01-10',
+                date_end="2026-01-17"
+            )).json())
+            exit()
             
         except Exception as error:
             log.critical(f"! Критическая ошибка при инициализации сессии: {str(error)}")
