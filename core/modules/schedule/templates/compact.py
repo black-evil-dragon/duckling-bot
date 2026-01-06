@@ -4,6 +4,10 @@ from core.modules.schedule.templates.default import DefaultTemplate
 
 class CompactTemplate(DefaultTemplate):
     
+    
+    def weekday_name_component(self, weekday_name):
+        return f"<b>📚 {weekday_name}</b>"
+    
     def lesson_component(self, lesson: dict) -> str:
         title = lesson.get('title', '')
         time = lesson.get('time', '')
@@ -16,9 +20,13 @@ class CompactTemplate(DefaultTemplate):
         if 'Дистант' in location:
             location = 'Дистант'
             
+        if subgroup:
+            time += f" {subgroup}"
+            
         return (
-            f"🕒 <b>[  {time} {subgroup}   ]</b>\n"
-            f"📚 {lesson_type} - {title}\n"
-            f"📍 {location}"
+            # ┌
+            f"🕒- <b>[  {time}  ]</b>\n"
+            f"  ├ {lesson_type} - {title}\n"
+            f"  └ {location}"
         )
   

@@ -49,7 +49,7 @@ class DefaultTemplate(BaseTemplate):
         message += (
             f"{self.header_component(group, week_odd_even, date)}"
             "\n\n"
-            f"{weekday_name}"
+            f"{self.weekday_name_component(weekday_name)}"
             "\n"
         )
 
@@ -103,7 +103,7 @@ class DefaultTemplate(BaseTemplate):
         # Weekdays
         for day_key in week.get('days', {}):
             # Weekday
-            message += self.weekday_component(week.get('date_start'), int(day_key))
+            message += self.weekday_component(week.get('date_start'), int(day_key)) + "\n"
 
             # Lessons
             lessons = week['days'][day_key]

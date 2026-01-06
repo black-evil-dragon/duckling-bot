@@ -36,19 +36,28 @@ class BaseTemplate:
 
         
         return (
-            f"<b>📅 Расписание группы {group_name}</b>"
+            f"<b>📅 Расписание группы {group_name}</b>\n"
             f"<b>| {week_type} | {date_info} |</b>"
         )
     
+    def weekday_name_component(self,
+        weekday_name: str
+    ):
+        return f"<b>{weekday_name}</b>"    
     
-    def weekday_component(self, date_start: str, day_key: int = None):
+
+    def weekday_component(self,
+        date_start: str,
+        day_key: int = None
+    ):
         weekday = self.get_weekday_name(day_key)
         
         if day_key:
             weekday += f" ({self.get_date_by_weekday(date_start, int(day_key))})"
 
-        return f"<b>{weekday}</b>"
+        return self.weekday_name_component(weekday)
     
+
     
     def lesson_component(self, lesson: Dict[str, str])  -> str:
         title = lesson.get('title', '')
@@ -63,19 +72,24 @@ class BaseTemplate:
             location = 'Дистант'
             
         return (
-            f"* 🕒 <b>{time} {subgroup}</b>\n"
-            f"| 📚 {title}\n"
-            f"| 🎯 {lesson_type}\n"
-            f"| 👨‍🏫 {teacher}\n"
-            f"| 📍 {location}"
+            f"┌ 🕒 <b>{time} {subgroup}</b>\n"
+            f"├ 📚 {title}\n"
+            f"├ 🎯 {lesson_type}\n"
+            f"├ 👨‍🏫 {teacher}\n"
+            f"└ 📍 {location}"
         )
     
     
     def footer_component(self, last_update: str) -> str:
-        return (
-            f"<i>Последнее обновление: {last_update}\n</i>" if last_update else "\n"
-            f"Получено: {datetime.datetime.now().time()}"
-        )
+        result = ""
+        
+        if last_update:
+            result += f"<i>Последнее обновление: {last_update}</i>\n"
+            
+        result += f"Получено: {datetime.datetime.now().time()}\n"
+        
+
+        return result
     
     
     # * Utils
@@ -100,17 +114,4 @@ class BaseTemplate:
             'консультация': 'КОНС',
         }
         return short_lesson_types.get(lesson_type, lesson_type)
-    
-    # ! DEPRECATED ----------------------------------
-    def schedule_title(self, title: str) -> str:
-        return f"<b>📅 Расписание группы {title}</b>"
-    
-    def week_info(self, week_type: str, first_date: str, last_date: str = None) -> str:
-        first_date = datetime.datetime.strptime(first_date, "%Y-%m-%d").strftime("%d.%m.%Y")
-
-        if last_date is not None:
-            last_date = datetime.datetime.strptime(last_date, "%Y-%m-%d").strftime("%d.%m.%Y")
-            return f"<b>| {week_type} | {first_date} - {last_date} |</b>"
-        
-        return f"<b>| {week_type} | {first_date} |</b>"
 
