@@ -11,18 +11,19 @@ class CommandNames(TextChoices):
     HELP = "help", "Помощь"
     MENU = "menu", "Меню"
     SETTINGS = "settings", "Настройки"
-    
+
     SET_GROUP = "group", "Установить группу"
     SET_SUBGROUP = "subgroup", "Установить подгруппу"
-    
+
     SET_REMINDER = "setreminder", "Установить время рассылки"
     SHOW_REMINDER = "myreminder", "Моя рассылка"
-    
+
     SCHEDULE = "schedule", "Расписание"
+    DATE = "date", "Расписание на дату"
     WEEK = "week", "Расписание на неделю"
     TODAY = "today", "Расписание на сегодня"
     TOMORROW = "tomorrow", "Расписание на завтра"
-    
+
 
 class Command:
     name = ""
@@ -30,7 +31,7 @@ class Command:
 
     def __init__(self, name, description = None):
         self.name = name
-        
+
         if description is None:
             description = CommandNames.get_label(name)
 
@@ -59,10 +60,11 @@ COMMANDS_LIST = [
     Command(CommandNames.SET_SUBGROUP),
     Command(CommandNames.WEEK),
     Command(CommandNames.TODAY),
-    
+    Command(CommandNames.DATE),
+
     Command(CommandNames.SET_REMINDER),
     Command(CommandNames.SHOW_REMINDER),
-    
+
     Command(CommandNames.TOMORROW),
     Command(CommandNames.SETTINGS),
     Command(CommandNames.HELP),

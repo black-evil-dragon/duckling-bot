@@ -45,7 +45,7 @@ def reminder_say_hello(day_id: int):
         5: "Суббота - день для отдыха и саморазвития!",
         6: "Воскресенье - готовимся к новой неделе!"
     }
-    
+
     return templates[day_id]
 
 
@@ -67,7 +67,7 @@ def reminder_keyboard_default(settings: dict):
                 InlineKeyboardButton(
                     text=f"На завтра {'✅' if not settings.get('reminder_today', True) else '❌'}",
                     callback_data=f"settings#bool${not settings.get('reminder_today', True)}$reminder_today"
-                ), 
+                ),
             ],
             [
                 BaseModule.delegate_button_template(

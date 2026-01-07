@@ -19,15 +19,15 @@ def setup_modules(application: 'Application'):
     """
     log.info('Иницилизация модулей')
     modules: List[BaseModule] = [
-        ScheduleModule(),
-        GroupModule(),
-        ReminderModule(),
-        StartModule(),
+        ScheduleModule,
+        GroupModule,
+        ReminderModule,
+        StartModule,
     ]
 
     for module in modules:
         try:
-            module.setup(application)
+            module(application)
             log.info(f'| {module} - установлен')
 
         except Exception:

@@ -1,5 +1,7 @@
 import datetime
+from typing import Any, Dict
 from core.modules.schedule.templates.base import BaseTemplate
+from core.modules.base import strf_time_mask
 
 # * Default template
 class DefaultTemplate(BaseTemplate):
@@ -7,13 +9,13 @@ class DefaultTemplate(BaseTemplate):
     # | Чётная | 01.10.2025 |
 
     # Среда
-    # * 🕒 09:40 - 11:10  
+    # * 🕒 09:40 - 11:10
     # | 📚 Основы теории управления
     # | 🎯 Лекция
     # | 👨‍🏫 доц., Сергушичева Анна Павловна
     # | 📍 к. 4, ауд. 2а
 
-    # * 🕒 11:40 - 13:10  
+    # * 🕒 11:40 - 13:10
     # | 📚 Основы программно-информационных систем
     # | 🎯 Лекция
     # | 👨‍🏫 ст.пр., Ковырзина Татьяна Федоровна
@@ -21,17 +23,17 @@ class DefaultTemplate(BaseTemplate):
 
     # Последнее обновление: 30.09.2025 15:54:20
     # Получено: 19:17:09.294201
-    
+
     def get_message(self, data: dict, data_type: str = 'day', week_number: int = None) -> str:
         if data_type == 'day':
             return self.format_schedule_day(data)
-        
+
         if data_type == 'weeks':
-            return self.format_schedule_weeks(data, week_number)
-        
-              
-           
-    
+            return self.format_schedule_weeks(data)
+
+
+
+
     def format_schedule_day(self, data: dict) -> str:
         # Ininital data
         message = ""
@@ -40,7 +42,7 @@ class DefaultTemplate(BaseTemplate):
         week_number = data.get('week_number', 0)
         week_day = data.get('week_day', '')
         lessons = data.get('lessons', [])
-        
+
         # Prepare
         week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
         weekday_name = self.get_weekday_name(week_day)
@@ -64,49 +66,38 @@ class DefaultTemplate(BaseTemplate):
 
 
         message += self.footer_component(data.get('last_update', ''))
-        
+
         return message
-    
-    
-    
-    def format_schedule_weeks(self, data: dict, week_number: int = None) -> str:
+
+
+
+    def format_schedule_weeks(self, data: dict) -> str:
         # Prepare data
         message = ""
-        group: str = data.get('group', '')
-        
-        weeks: dict = data.get('data', {})
-        if not weeks:
-            return "Расписание не найдено"
-        
-        if week_number is None:
-            week_number = list(weeks.keys())[0]
-        
-        
-        week: dict = weeks.get(week_number)
-        if not week:
-            return "Неделя не найдена"
-        
-        week_odd_even = "Нечётная" if week['is_odd'] else "Чётная"
 
+        group_name: str = data.get('group', '')
 
         # Create message
         message += (
             f"{self.header_component(
-                group,
-                week_odd_even,
-                week.get('date_start'), week.get('date_end')
+                group_name,
+                data.get('date_start'),
+                data.get('date_end')
             )}"
             "\n\n"
         )
-        
-        
+
+        days: dict = data.get('days', {})
+        day_key: str
+        day_value: Dict[str, Any]
+
         # Weekdays
-        for day_key in week.get('days', {}):
+        for day_key, day_value in days.items():
             # Weekday
-            message += self.weekday_component(week.get('date_start'), int(day_key)) + "\n"
+            message += self.weekday_component(day_key, day_value.get('week_day')) + "\n"
 
             # Lessons
-            lessons = week['days'][day_key]
+            lessons = day_value['lessons']
             if not lessons:
                 message += "❌ Занятий нет\n\n"
                 continue
@@ -120,4 +111,3 @@ class DefaultTemplate(BaseTemplate):
         message += self.footer_component(data.get('last_update', ''))
 
         return message
-    

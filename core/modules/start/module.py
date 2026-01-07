@@ -5,7 +5,7 @@ from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
 
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
-from telegram.ext import ContextTypes, Application
+from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 from telegram.error import BadRequest
@@ -35,33 +35,26 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class StartModule(BaseModule):
-
-    application: 'Application' = None
-
-
-
-    def setup(self, application: 'Application') -> None:
-        application.add_handler(MessageHandler(
-            filters.ALL, 
+    def setup(self) -> None:
+        self.application.add_handler(MessageHandler(
+            filters.ALL,
             self.update_user_settings
         ), group=-1)
 
-        application.add_handler(MessageHandler(
-            ~filters.COMMAND, 
+        self.application.add_handler(MessageHandler(
+            ~filters.COMMAND,
             self.some_text
-        ), group=-1) 
+        ), group=-1)
 
-        application.add_handler(CommandHandler(CommandNames.START, self.start))
-        application.add_handler(CommandHandler(CommandNames.HELP, self.help))
-        application.add_handler(CommandHandler(CommandNames.MENU, self.get_menu))
-        application.add_handler(CommandHandler(CommandNames.SETTINGS, self.send_settings))
-
-
-        application.add_handler(CallbackQueryHandler(self.handle_settings, pattern="^settings#"))
-        application.add_handler(CallbackQueryHandler(self.handle_inline_commands, pattern="^delegate#"))
+        self.application.add_handler(CommandHandler(CommandNames.START, self.start))
+        self.application.add_handler(CommandHandler(CommandNames.HELP, self.help))
+        self.application.add_handler(CommandHandler(CommandNames.MENU, self.get_menu))
+        self.application.add_handler(CommandHandler(CommandNames.SETTINGS, self.send_settings))
 
 
-        self.application = application
+        self.application.add_handler(CallbackQueryHandler(self.handle_settings, pattern="^settings#"))
+        self.application.add_handler(CallbackQueryHandler(self.handle_inline_commands, pattern="^delegate#"))
+
 
 
     @classmethod
@@ -78,32 +71,32 @@ class StartModule(BaseModule):
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
         }
-        
+
         # !КОСТЫЛЬ
         handler_map.update({
             CommandNames.SET_REMINDER: ReminderModule.ask_reminder_time,
             CommandNames.SHOW_REMINDER: ReminderModule.show_reminder_info,
         })
-        
+
 
         if command in handler_map:
             await handler_map[command](update, context)
 
         elif command == 'menu':
             await cls.get_menu(update, context)
-            
-            
+
+
 
     @classmethod
     async def show_command_keyboard(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE') -> None:
         buttons = context.bot_data['command_keyboard']
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
         update_message = update.message or update.callback_query.message
-    
+
         await update_message.reply_text(
             messages.show_command_keyboard,
             reply_markup=reply_markup
-        
+
         )
 
 
@@ -124,7 +117,7 @@ class StartModule(BaseModule):
     @classmethod
     async def help(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
-        
+
         await update_message.reply_text(get_commands_text())
         await cls.show_command_keyboard(update, context)
 
@@ -146,7 +139,7 @@ class StartModule(BaseModule):
             ("set_group", "Установить группу", GroupModule.ask_institute),
             (None, None, None),
             ("set_subgroup", "Установить подгруппу", GroupModule.ask_subgroup),
-            
+
             ("settings", "Настройки", cls.send_settings),
         )
 
@@ -160,10 +153,10 @@ class StartModule(BaseModule):
         MENU_COMMANDS = cls.get_menu_commands(context)
 
         reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd] 
+            [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd]
             for i in range(0, len(MENU_COMMANDS), 3)
         ])
-        
+
         await update_message.reply_text(
             "📋 Главное меню:",
             reply_markup=reply_markup
@@ -177,7 +170,7 @@ class StartModule(BaseModule):
         user_settings: dict = context.user_data.get('user_settings', {})
         # _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
 
-                    
+
         SETTINGS_COMMANDS = (
             None,
             (
@@ -209,14 +202,14 @@ class StartModule(BaseModule):
             None,
             (f"delegate#{CommandNames.SET_REMINDER}", "⏰ Выбрать время"),
             (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
-            
+
             None,
             (f"delegate#{CommandNames.MENU}", "📍 Меню"),
             None,
         )
 
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton(text=command[1], callback_data=f"{command[0]}") for command in SETTINGS_COMMANDS[i:i+3] if command] 
+            [InlineKeyboardButton(text=command[1], callback_data=f"{command[0]}") for command in SETTINGS_COMMANDS[i:i+3] if command]
             for i in range(0, len(SETTINGS_COMMANDS), 3)
         ])
 
@@ -226,9 +219,9 @@ class StartModule(BaseModule):
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
-        
+
         # ? Что это такое???
-        # Это прикол, который позволяет отправлять 
+        # Это прикол, который позволяет отправлять
         # свой markup с text через контекст
         context.user_data.update(dict(
             send_custom_settings=False,
@@ -260,15 +253,15 @@ class StartModule(BaseModule):
     # * |               Callback handlers                            |
     @staticmethod
     @ensure_user_settings(need_update=True)
-    async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):      
+    async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         query = update.callback_query
 
         await query.answer()
-        
+
         user: User = context.user_data.get('user_model')
         user_settings: dict = context.user_data.get('user_settings', {})
-        
+
         # * Определение настройки
         command = query.data.split('#')[-1]
         value_type, value, setting = command.split('$')
@@ -284,7 +277,7 @@ class StartModule(BaseModule):
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             await GroupModule.ask_subgroup(update, context)
-        
+
         if setting == 'reminder':
             subscriber: "Subscriber" = Subscriber.objects.update_or_create(
                 user_id=user.id,
@@ -300,8 +293,8 @@ class StartModule(BaseModule):
                 )
                 # await GroupModule.ask_institute(update, context)
                 return
-            
-    
+
+
             if subscriber.schedule_time is None:
                 await context.bot.send_message(
                     chat_id=user.user_id,
@@ -309,31 +302,31 @@ class StartModule(BaseModule):
                 )
                 # await ReminderModule.ask_reminder_time(update, context)
                 return
-                
-                
+
+
             await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
-        
-        
+
+
         # * Обновление данных
         user_settings = user.set_setting(setting, value, value_type)
         context.user_data.update(dict(user_settings=user_settings))
-        
-        
+
+
         # !КОСТЫЛЬ.. Наверное
         # См метод send_settings
         # * Надстройка для отправки своего markup и text
         reply_markup = StartModule.get_settings(update, context)
         text = messages.settings_text
-        
+
         if context.user_data.get('send_custom_settings', False):
             get_custom_markup = context.user_data.get('get_custom_markup')
-            
+
             if get_custom_markup:
                 reply_markup = get_custom_markup(user_settings)
-            
+
             text = context.user_data.get('custom_settings_text', messages.settings_text)
-        
-    
+
+
         # * Отправка сообщения
         try:
             await update_message.edit_text(

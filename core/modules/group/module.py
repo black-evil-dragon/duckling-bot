@@ -28,18 +28,17 @@ class GroupModule(BaseModule):
     group_ids = Group.load_from_json().get('groups')
 
 
-
-    def setup(self, application: 'Application'):
+    def setup(self):
         # Command
-        application.add_handler(CommandHandler(CommandNames.SET_GROUP, self.ask_institute))
-        application.add_handler(CommandHandler(CommandNames.SET_SUBGROUP, self.ask_subgroup))
+        self.application.add_handler(CommandHandler(CommandNames.SET_GROUP, self.ask_institute))
+        self.application.add_handler(CommandHandler(CommandNames.SET_SUBGROUP, self.ask_subgroup))
 
         # Message
-        application.add_handler(
+        self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_group_selection),
             group=1
         )
-        application.add_handler(
+        self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_subgroup),
             group=2
         )
@@ -74,8 +73,8 @@ class GroupModule(BaseModule):
                 for institute in list(cls.group_ids)[i:i+3]
             ] for i in range(0, len(list(cls.group_ids)), 3)
         ], one_time_keyboard=True, resize_keyboard=True)
-        
-        
+
+
         # * Return
         await update_message.reply_text(
             messages.choose_institute,
@@ -162,29 +161,27 @@ class GroupModule(BaseModule):
         # Выбор института
         if context.user_data.get("selected_institute") is None:
             await self.selection_institute(update, context)
-        
+
         # Выбор курса
         elif context.user_data.get("selected_course") is None:
             await self.selection_course(update, context)
-        
+
         # Выбор группы
         elif context.user_data.get("selected_group") is None:
             await self.selection_group(update, context)
 
 
-    #* ---------- Select institute 
+    #* ---------- Select institute
     @ensure_dialog_branch('group_selection')
     async def selection_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
 
         if user_input not in self.group_ids.keys():
-            
+
             await update.message.reply_text(
                 messages.institute_wrong_choice,
-                # reply_markup=ReplyKeyboardRemove()
             )
 
-            # await self.ask_institute(update, context)
             return
 
 
@@ -195,30 +192,28 @@ class GroupModule(BaseModule):
 
 
 
-    #* ---------- Select course 
+    #* ---------- Select course
     @ensure_dialog_branch('group_selection')
     async def selection_course(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
 
         institute = context.user_data.get("selected_institute")
         courses = self.group_ids.get(institute, [])
-        
-        
+
+
         # Наверное тут лучше через метод проверять и убрать лишние if elif, но пока так
         if not user_input.isdigit() or user_input not in courses:
             await update.message.reply_text(
                 messages.course_wrong_choice
             )
-
-            # await self.ask_course(update, context)
             return
-        
+
 
         context.user_data["selected_course"] = user_input
 
         await self.ask_group(update, context)
         return True
-            
+
 
 
     #* ---------- Select group
@@ -261,12 +256,12 @@ class GroupModule(BaseModule):
         context.user_data["selected_group"] = group_id
 
         user.set_group(group_id)
-        
+
         await update.message.reply_text(
             messages.result_choices(institute, course, user_input),
             reply_markup=ReplyKeyboardRemove()
         )
-        
+
         # Столкнулся с тем, что этод метод должен продолжить работу
         # Пока код находит среди ввода группы, но и при этом не завершать
         # работу dialog с помощью stop_after=True
@@ -293,16 +288,16 @@ class GroupModule(BaseModule):
             return
 
         selected_subgroup = SUBGROUP_IDS[user_input]
-        
+
         context.user_data["selected_subgroup"] = selected_subgroup
 
         user.set_subgroup(selected_subgroup, set_subgroup_lock=True)
-        
+
 
         await update.message.reply_text(
             messages.result_subgroup_choice(user_input),
             reply_markup=ReplyKeyboardRemove()
         )
         return True
-            
+
     # * |___________________________________________________________|
