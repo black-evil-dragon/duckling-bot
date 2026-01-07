@@ -189,9 +189,7 @@ class BaseModule:
         calendar, value = query_data.split('&')
 
         if calendar == 'day':
-            await query.edit_message_text(
-                text=BaseMessages.
-            )
+            await query.edit_message_text(f"Вы выбрали дату: {value}")
 
         elif calendar == 'month':
             year_str, month_str = value.split("_")

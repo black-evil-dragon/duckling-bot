@@ -66,8 +66,7 @@ class StartModule(BaseModule):
 
         # Получаем номер недели из callback_data
         command = str(query.data.split('#')[-1])
-        
-        # ! КОСТЫЛЬ 
+
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
         }

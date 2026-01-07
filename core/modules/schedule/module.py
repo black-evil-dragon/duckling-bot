@@ -3,6 +3,8 @@
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes
 
+import telegram
+
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
 from core.modules.base import BaseModule, strf_time_mask
@@ -22,11 +24,8 @@ from datetime import date as DateType
 from typing import Tuple
 from utils.logger import get_logger
 
-import asyncio
 import traceback
 import requests
-
-
 
 
 log = get_logger()
@@ -85,58 +84,58 @@ class ScheduleModule(BaseModule):
             response.raise_for_status()
         except Exception as error:
             log.error(f'Ошибка при запросе: {error}. Данные ответа: {response}. Данные запроса: {params}')
-        
+
         response_json: dict = response.json()
-        
+
         if response_json.get('last_update'):
             response_json['data']['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
-        
-        
+
+
         # log.debug(f'Получен ответ: {response_json}')
         return response_json
-    
-    
-    
+
+
+
     @staticmethod
     def get_schedule_query(
         group_id: int = None,
         user_data: dict = None,
         date_start: datetime = datetime.today(),
         date_end: datetime = None,
-    ):  
+    ):
         if user_data is None:
             user_data = {}
 
         user_settings: dict = user_data.get('user_settings', {})
-        
+
         params = dict(
             group_id=str(user_data.get('selected_group', None) or group_id),
             selected_lesson_type="typical",
         )
-        
-    
+
+
         if date_end is not None:
             params.update(dict(
                 date_start=date_start.strftime(strf_time_mask),
                 date_end=date_end.strftime(strf_time_mask),
             ))
-            
+
         else:
             params.update(dict(
                 date=date_start.strftime(strf_time_mask),
             ))
-        
-        
+
+
         if user_settings.get('subgroup_lock', False) and user_data.get('selected_subgroup'):
             params.update(dict(
                 subgroup=user_data.get('selected_subgroup')
             ))
-        
+
 
         return params
-    
-    
-    
+
+
+
     @staticmethod
     def get_prev_next_day(current_day: 'DateType', strftime=False) -> Tuple[DateType, DateType] | Tuple[str, str]:
         """
@@ -147,19 +146,19 @@ class ScheduleModule(BaseModule):
 
         returns:
             Tuple[date, date]: Кортеж дат
-        """        
+        """
 
         if current_day.weekday() != WeekDay.MONDAY:
             prev_date = current_day - timedelta(days=1)
         else:
             prev_date = current_day - timedelta(days=2)
 
-        
+
         if current_day.weekday() != WeekDay.SATURDAY:
             next_date = current_day + timedelta(days=1)
         else:
             next_date = current_day + timedelta(days=2)
-        
+
         if strftime:
             prev_date = prev_date.strftime(strf_time_mask)
             next_date = next_date.strftime(strf_time_mask)
@@ -192,27 +191,27 @@ class ScheduleModule(BaseModule):
         session: 'requests.Session',
 
         group_id: int,
-        
+
         schedule_type: str = "day",
         user_data: dict = None,
-        
+
         date_start: datetime = datetime.today(),
         date_end: datetime = None,
 
     ) -> dict:
         if user_data is None: user_data = {}
-        
+
         if schedule_type == "day" and date_start.weekday() == WeekDay.SUNDAY:
             date_start += timedelta(days=1)
-                
-                
+
+
         data = dict(
             group_id=group_id,
             date_start=date_start,
             date_end=date_end,
             user_data=user_data
         )
-    
+
 
         request = dict(
             session=session,
@@ -220,13 +219,13 @@ class ScheduleModule(BaseModule):
             params=cls.get_schedule_query(**data),
         )
 
-        
+
         response_data: dict = ScheduleModule.fetch_data(**request)
 
 
         return response_data.get('data', {})
-    
-    
+
+
     @classmethod
     def get_message_schedule(cls, data: dict, is_daily: bool = True, date: "DateType" = datetime.today()) -> dict:
         additional_buttons = None
@@ -291,9 +290,9 @@ class ScheduleModule(BaseModule):
             await ScheduleModule.get_schedule_week(update, context)
         else:
             await ScheduleModule.get_schedule_day(update, context)
-            
-            
-            
+
+
+
     @staticmethod
     @ensure_user_settings()
     async def get_schedule_next_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
@@ -301,14 +300,14 @@ class ScheduleModule(BaseModule):
 
         await ScheduleModule.get_schedule_day(update, context)
 
-    
-    
+
+
     @staticmethod
     @ensure_user_settings()
     async def get_schedule_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
         update_message = update.message or update.callback_query.message
-    
+
         # Проверяем наличие сессии
         if not session:
             await update_message.reply_text(messages.session_error)
@@ -320,10 +319,10 @@ class ScheduleModule(BaseModule):
             return
 
 
-        
+
         try:
             today = datetime.now().date()
-            
+
             if context.user_data.get('need_tomorrow', False):
                 today += timedelta(days=1)
                 context.user_data.update(dict(
@@ -338,24 +337,24 @@ class ScheduleModule(BaseModule):
                 user_data=context.user_data
             ))
             message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=today)
-            
+
             await update_message.reply_text(**message)
 
-            
+
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error)
-        
+
 
 
     @staticmethod
     @ensure_user_settings()
     async def get_schedule_week(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
-    
+
         update_message = update.message or update.callback_query.message
 
-        
+
         if not session:
             await update_message.reply_text(messages.session_error)
             return
@@ -365,7 +364,7 @@ class ScheduleModule(BaseModule):
             await GroupModule.ask_institute(update, context)
             return
 
-        
+
         try:
             today = datetime.now().date()
             date_start = today - timedelta(days=today.weekday())
@@ -443,30 +442,30 @@ class ScheduleModule(BaseModule):
     @ensure_user_settings()
     async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
-        
+
         query = update.callback_query
         query_data = query.data.split('#')
         query_date = datetime.strptime(query_data[-1], strf_time_mask)
-        
+
         await query.answer()
 
 
         if not session:
             await query.edit_message_text(messages.session_error)
             return
-        
+
         if not context.user_data.get('selected_group', False):
             await GroupModule.ask_institute(update, context)
             return
-        
-        args = dict( 
+
+        args = dict(
             session=session,
             group_id=context.user_data.get('selected_group'),
             date_start=query_date,
             user_data=context.user_data
         )
-            
-            
+
+
         schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
         message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
 
@@ -477,15 +476,15 @@ class ScheduleModule(BaseModule):
             if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
                 log.error(f'Ошибка отправки сообщения [{exception.message}]')
                 log.warning('Пробуем отправить еще раз!')
-                
+
                 await context.bot.send_message(
                     chat_id=context.user_data.get('user_id'),
                     **message
                 )
                 return
-            
+
             log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-            
+
         except Exception as exception:
             log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
 
