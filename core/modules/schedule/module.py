@@ -2,6 +2,7 @@
 #* Telegram bot framework ________________________________________________________________________
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes, Application
+import telegram
 
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
@@ -12,7 +13,7 @@ from core.modules.group.module import GroupModule
 from core.session import Session
 from core.settings.commands import CommandNames
 
-from .formatters import prepare_schedule_weeks_data, prepare_schedule_day_data
+from .formatters import prepare_schedule_weeks_data, prepare_schedule_day_data, split_message
 
 from . import messages
 
@@ -23,7 +24,7 @@ from datetime import date as DateType
 from typing import Tuple
 from utils.logger import get_logger
 
-
+import asyncio
 import traceback
 import requests
 
@@ -36,11 +37,6 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class ScheduleModule(BaseModule):
-
-    template_manager = messages.TemplateManager()
-    session: requests.Session = None
-
-
     def setup(self, application: Application):
         # Command
         application.add_handler(CommandHandler(CommandNames.SCHEDULE, self.schedule_handler))
@@ -51,8 +47,6 @@ class ScheduleModule(BaseModule):
         # Callback
         application.add_handler(CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day#"))
         application.add_handler(CallbackQueryHandler(self.schedule_week_callback, pattern="^schedule_week#"))
-
-        self.session = application.bot_data.get('session')
 
 
 
@@ -65,7 +59,7 @@ class ScheduleModule(BaseModule):
         path: str,
         params: dict,
     ) -> dict:
-        log.debug(f'Отправлен запрос: {path}')
+        # log.debug(f'Отправлен запрос: {path}')
         response = session.post(
             path,
             json=params
@@ -75,58 +69,58 @@ class ScheduleModule(BaseModule):
             response.raise_for_status()
         except Exception as error:
             log.error(f'Ошибка при запросе: {error}. Данные ответа: {response}. Данные запроса: {params}')
-
+        
         response_json: dict = response.json()
-
+        
         if response_json.get('last_update'):
             response_json['data']['last_update'] = datetime.strptime(response_json['last_update'], "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
-
-
+        
+        
         # log.debug(f'Получен ответ: {response_json}')
         return response_json
-
-
-
+    
+    
+    
     @staticmethod
     def get_schedule_query(
         group_id: int = None,
         user_data: dict = None,
         date_start: datetime = datetime.today(),
         date_end: datetime = None,
-    ):
+    ):  
         if user_data is None:
             user_data = {}
 
         user_settings: dict = user_data.get('user_settings', {})
-
+        
         params = dict(
             group_id=str(user_data.get('selected_group', None) or group_id),
             selected_lesson_type="typical",
         )
-
-
+        
+    
         if date_end is not None:
             params.update(dict(
                 date_start=date_start.strftime(strf_time_mask),
                 date_end=date_end.strftime(strf_time_mask),
             ))
-
+            
         else:
             params.update(dict(
                 date=date_start.strftime(strf_time_mask),
             ))
-
-
+        
+        
         if user_settings.get('subgroup_lock', False) and user_data.get('selected_subgroup'):
             params.update(dict(
                 subgroup=user_data.get('selected_subgroup')
             ))
-
+        
 
         return params
-
-
-
+    
+    
+    
     @staticmethod
     def get_prev_next_day(current_day: 'DateType', strftime=False) -> Tuple[DateType, DateType] | Tuple[str, str]:
         """
@@ -137,69 +131,54 @@ class ScheduleModule(BaseModule):
 
         returns:
             Tuple[date, date]: Кортеж дат
-        """
+        """        
 
         if current_day.weekday() != WeekDay.MONDAY:
             prev_date = current_day - timedelta(days=1)
         else:
             prev_date = current_day - timedelta(days=2)
 
-
+        
         if current_day.weekday() != WeekDay.SATURDAY:
             next_date = current_day + timedelta(days=1)
         else:
             next_date = current_day + timedelta(days=2)
-
+        
         if strftime:
             prev_date = prev_date.strftime(strf_time_mask)
             next_date = next_date.strftime(strf_time_mask)
 
         return prev_date, next_date
 
-
-    @staticmethod
-    def get_prev_next_week(current_day: 'DateType', strftime=False) -> Tuple[DateType, DateType] | Tuple[str, str]:
-        """
-        Возвращает кортеж дат +- номер недели от текущего дня
-        """
-
-        prev_period = current_day - timedelta(days=7)
-        next_period = current_day + timedelta(days=7)
-
-        prev_week_number = prev_period.isocalendar().week
-        next_week_number = next_period.isocalendar().week
-
-        return prev_week_number, next_week_number
-
-
-
+    
+    
     @classmethod
     def get_schedule_by_group_id(
         cls,
         session: 'requests.Session',
 
         group_id: int,
-
+        
         schedule_type: str = "day",
         user_data: dict = None,
-
+        
         date_start: datetime = datetime.today(),
         date_end: datetime = None,
 
     ) -> dict:
         if user_data is None: user_data = {}
-
+        
         if schedule_type == "day" and date_start.weekday() == WeekDay.SUNDAY:
             date_start += timedelta(days=1)
-
-
+                
+                
         data = dict(
             group_id=group_id,
             date_start=date_start,
             date_end=date_end,
             user_data=user_data
         )
-
+    
 
         request = dict(
             session=session,
@@ -207,45 +186,46 @@ class ScheduleModule(BaseModule):
             params=cls.get_schedule_query(**data),
         )
 
-
+        
         response_data: dict = ScheduleModule.fetch_data(**request)
 
 
         return response_data.get('data', {})
-
-
+    
+    
     @classmethod
     def get_message_schedule(cls, data: dict, is_daily: bool = True, date: "DateType" = datetime.today()) -> dict:
         formatter = None
+        serializer = None
         additional_buttons = None
-
-        template = cls.template_manager.get_template('default')
-
-
+        
+        
         if is_daily:
             formatter = prepare_schedule_day_data
-
+            serializer = messages.serialize_schedule_day
+            
             if date.weekday() == WeekDay.SUNDAY:
                 date += timedelta(days=1)
         else:
             formatter = prepare_schedule_weeks_data
-
+            serializer = messages.serialize_schedule_weeks
+            
 
         prepare_data = formatter(data)
-        message = template.get_message(prepare_data)
-
-
-        prev_key, next_key = cls.get_prev_next_day(date, strftime=True) if is_daily else cls
-
+        message = serializer(prepare_data)
+            
+        
+        prev_key, next_key = cls.get_prev_next_day(date, strftime=True)
+         
         callback_data = 'schedule_week'
         entity = 'Неделя'
-
+        
         if is_daily:
             callback_data = 'schedule_day'
             entity = 'День'
             additional_buttons = [messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}')]
-
-
+        
+        
         return dict(
             text=message,
             parse_mode='HTML',
@@ -267,15 +247,16 @@ class ScheduleModule(BaseModule):
     @staticmethod
     @ensure_user_settings()
     async def schedule_handler(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        schedule_week = context.user_data.get('user_settings', {}).get('show_week', True)
+
+        schedule_week = context.user_data.get('user_settings', {}).get('show_week', False)
 
         if schedule_week:
             await ScheduleModule.get_schedule_week(update, context)
         else:
             await ScheduleModule.get_schedule_day(update, context)
-
-
-
+            
+            
+            
     @staticmethod
     @ensure_user_settings()
     async def get_schedule_next_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
@@ -283,14 +264,14 @@ class ScheduleModule(BaseModule):
 
         await ScheduleModule.get_schedule_day(update, context)
 
-
-
+    
+    
     @staticmethod
     @ensure_user_settings()
     async def get_schedule_day(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
         update_message = update.message or update.callback_query.message
-
+    
         # Проверяем наличие сессии
         if not session:
             await update_message.reply_text(messages.session_error)
@@ -302,45 +283,45 @@ class ScheduleModule(BaseModule):
             return
 
 
-
+        
         try:
             today = datetime.now().date()
-
+            
             if context.user_data.get('need_tomorrow', False):
                 today += timedelta(days=1)
                 context.user_data.update(dict(need_tomorrow=False))
-
-
-            args = dict(
+                
+                
+            args = dict( 
                 session=session,
                 group_id=context.user_data.get('selected_group'),
                 date_start=today,
                 user_data=context.user_data
             )
-
-
+            
+            
             schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
             message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=today)
-
+            
             await update_message.reply_text(**message)
 
-
+            
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error)
+        
 
 
-
-    @classmethod
+    @staticmethod
     @ensure_user_settings()
     # ! DEPRECATED
     # ! Нужно переписать под логику как с днями
-    async def get_schedule_week(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def get_schedule_week(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
-
+    
         update_message = update.message or update.callback_query.message
 
-
+        
         if not session:
             await update_message.reply_text(messages.session_error)
             return
@@ -350,43 +331,22 @@ class ScheduleModule(BaseModule):
             await GroupModule.ask_institute(update, context)
             return
 
-
+        
         try:
             # Получаем расписание группы для трех недель
             today = datetime.now().date()
-            date_start = today - timedelta(days=today.weekday())
-            date_end = today + timedelta(days=6)
-
-            args = dict(
+        
+            request = dict(
                 session=session,
-                group_id=context.user_data.get('selected_group'),
-                schedule_type='period',
-                date_start=date_start,
-                date_end=date_end,
-                user_data=context.user_data
+                path="schedule/weeks/",
+                params=ScheduleModule.get_schedule_query(
+                    user_data=context.user_data,
+                    date_start=today,
+                    date_end=today + timedelta(weeks=3),
+                )
             )
-
-            schedule = cls.get_schedule_by_group_id(**args)
-            print(schedule)
-            message = cls.get_message_schedule(schedule, is_daily=False, date=today)
-            print(message)
-            exit()
-
-
-            # request = dict(
-            #     session=session,
-            #     path="schedule/period/",
-            #     params=ScheduleModule.get_schedule_query(
-            #         user_data=context.user_data,
-            #         date_start=date_start,
-            #         date_end=today + timedelta(days=6),
-            #     )
-            # )
-
-            # response_data: dict = ScheduleModule.fetch_data(**request)
-
-
-
+            
+            response_data: dict = ScheduleModule.fetch_data(**request)    
 
 
             schedule = dict(
@@ -395,13 +355,11 @@ class ScheduleModule(BaseModule):
                 last_update=response_data.get("data", {}).get('last_update', "")
             )
             context.user_data['schedule_weeks_data'] = schedule
-
-
-            template = cls.template_manager.get_template('compact')
-            # message = messages.serialize_schedule_weeks(schedule, 0)
-            message = template.get_message(schedule, 'weeks', 0)
+            
+            message = messages.serialize_schedule_weeks(schedule, 0)
             next_key = None if not len(schedule['data']) - 1 else 1
 
+        
             await update_message.reply_text(
                 text=message,
                 parse_mode='HTML',
@@ -412,15 +370,50 @@ class ScheduleModule(BaseModule):
                     next_key=next_key,
                 )
             )
-
+            
+            
             await update_message.reply_text(
                 text=messages.schedule_warning_cache,
                 parse_mode='HTML'
             )
+            
+        except telegram.error.BadRequest as exception:
+            # Возможно, Message is too long
+            if (
+                "Message is too long" in str(exception)
+                or 
+                "Message_too_long" in str(exception)
+            ):
+                parts = split_message(message, 4000)
+                
+                for i, part in enumerate(parts, 1):
+                    part_with_progress = f"({i}/{len(parts)})\n\n{part}"
+                    
+                    if i == len(parts):
+                        await update_message.reply_text(
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                            reply_markup=messages.use_paginator(
+                                callback_data='schedule_week',
+                                entity='Неделя',
 
+                                next_key=next_key,
+                            )
+                        )
+                    else:
+                        await update_message.reply_text(
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                        )
+                        await asyncio.sleep(.5)
+                        
+            else:
+                raise exception
+            
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error, parse_mode='HTML')
+
     # ! END DEPRECATED
 
     # * |___________________________________________________________|
@@ -437,32 +430,72 @@ class ScheduleModule(BaseModule):
         await query.answer()
 
         week_idx = int(query.data.split('#')[-1])
-
+        
 
         data = context.user_data.get('schedule_weeks_data')
         if not data:
             await query.edit_message_text(messages.schedule_without_data)
             return
-
-        # message = messages.serialize_schedule_weeks(data, week_idx)
-        template = self.template_manager.get_template('compact')
-        message = template.get_message(data, 'weeks', week_idx)
-
+        
+        message = messages.serialize_schedule_weeks(data, week_idx)
+        
         prev_key = None if week_idx == 0 else week_idx - 1
         next_key = None if week_idx == len(data['data']) - 1 else week_idx + 1
-
-
-        await query.edit_message_text(
-            text=message,
-            parse_mode='HTML',
-            reply_markup=messages.use_paginator(
-                callback_data='schedule_week',
-                entity='Неделя',
-                prev_key=prev_key,
-                next_key=next_key,
-
+        
+        try:
+            await query.edit_message_text(
+                text=message,
+                parse_mode='HTML',
+                reply_markup=messages.use_paginator(
+                    callback_data='schedule_week',
+                    entity='Неделя',
+                    prev_key=prev_key,
+                    next_key=next_key,
+                    
+                )
             )
-        )
+
+        except telegram.error.BadRequest as exception:
+            # Возможно, Message is too long
+            # ! В данном случае "Message_too_long"
+            if (
+                "Message is too long" in str(exception)
+                or 
+                "Message_too_long" in str(exception)
+            ):
+                parts = split_message(message, 4000)
+                user_id = context.user_data.get('user_id')
+                
+                for i, part in enumerate(parts, 1):
+                    part_with_progress = f"({i}/{len(parts)})\n\n{part}"
+                    
+                    if i == len(parts):
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                            reply_markup=messages.use_paginator(
+                                callback_data='schedule_week',
+                                entity='Неделя',
+
+                                next_key=next_key,
+                            )
+                        )
+                    else:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=part_with_progress,
+                            parse_mode='HTML',
+                        )
+                        await asyncio.sleep(.5)
+                        
+            else:
+                raise exception
+            
+        except Exception:
+            traceback.print_exc()
+            await query.edit_message_text(messages.server_error, parse_mode='HTML')
+
     # ! ENDDEPRECATED
 
 
@@ -471,33 +504,50 @@ class ScheduleModule(BaseModule):
     @ensure_user_settings()
     async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
-
+        
         query = update.callback_query
         query_data = query.data.split('#')
         query_date = datetime.strptime(query_data[-1], strf_time_mask)
-
+        
         await query.answer()
 
 
         if not session:
             await query.edit_message_text(messages.session_error)
             return
-
+        
         if not context.user_data.get('selected_group', False):
             await GroupModule.ask_institute(update, context)
             return
-
-        args = dict(
+        
+        args = dict( 
             session=session,
             group_id=context.user_data.get('selected_group'),
             date_start=query_date,
             user_data=context.user_data
         )
-
-
+            
+            
         schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
         message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=query_date)
 
-        await query.edit_message_text(**message)
+        try:
+            await query.edit_message_text(**message)
+
+        except telegram.error.BadRequest as exception:
+            if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
+                log.error(f'Ошибка отправки сообщения [{exception.message}]')
+                log.warning('Пробуем отправить еще раз!')
+                
+                await context.bot.send_message(
+                    chat_id=context.user_data.get('user_id'),
+                    **message
+                )
+                return
+            
+            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
+            
+        except Exception as exception:
+            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
 
     # * |___________________________________________________________|

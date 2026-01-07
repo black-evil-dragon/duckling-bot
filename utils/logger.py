@@ -26,7 +26,7 @@ def setup_logger(max_log_size=10 * 1024 * 1024, backup_count=5):
     logger.setLevel(level)
 
     formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)-5s] [%(module)-15s:%(funcName)-20s] %(message)s"
+        "[%(asctime)s] [%(levelname)-7s] [%(module)-12s:%(funcName)-24s] %(message)s"
     )
 
     # Логирование в консоль
