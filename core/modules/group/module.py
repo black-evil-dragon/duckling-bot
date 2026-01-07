@@ -1,5 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
+from typing import Any, Dict, List
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram import Update
 
@@ -18,7 +19,7 @@ from core.models import User as UserModel
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-
+from slugify import slugify
 
 log = get_logger()
 
@@ -26,6 +27,8 @@ log = get_logger()
 #* Module ________________________________________________________________________
 class GroupModule(BaseModule):
     group_ids = Group.load_from_json().get('groups')
+    groups: Dict[str, Any] = {}
+    group_keys: List[str] = []
 
 
     def setup(self):
@@ -43,6 +46,20 @@ class GroupModule(BaseModule):
             group=2
         )
 
+        for institute in self.group_ids:
+            for course in self.group_ids[institute]:
+                for group_name, group_id in self.group_ids[institute][course].items():
+                    slug = slugify(group_name)
+                    self.groups[slug] = dict(
+                        group_name=group_name,
+                        group_id=group_id,
+                        institute=institute,
+                        course=course
+                    )
+                    self.group_keys.append(slug)
+
+
+
 
 
     # * ____________________________________________________________
@@ -50,7 +67,7 @@ class GroupModule(BaseModule):
     @staticmethod
     def clear_choices(context: 'ContextTypes.DEFAULT_TYPE'):
         for key in ['selected_institute', 'selected_course', 'selected_group']:
-            context.user_data.pop(key, None)
+            context.user_data[key] = None
 
     # * |___________________________________________________________|
 
@@ -61,7 +78,7 @@ class GroupModule(BaseModule):
     #? /set_group - Изменяет группу пользователя
     @classmethod
     @ensure_user_settings(need_update=True)
-    @set_dialog_branch('group_selection', reset_attempt=True)
+    @set_dialog_branch('institute_selection', reset_attempt=True)
     async def ask_institute(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         cls.clear_choices(context)
         update_message = update.message or update.callback_query.message
@@ -83,7 +100,7 @@ class GroupModule(BaseModule):
 
 
     @classmethod
-    @set_dialog_branch('group_selection', reset_attempt=False)
+    @set_dialog_branch('course_selection', reset_attempt=False)
     async def ask_course(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         institute = context.user_data.get("selected_institute")
         courses = list(GroupModule.group_ids[institute])
@@ -103,13 +120,20 @@ class GroupModule(BaseModule):
         )
 
 
-    @classmethod
+
     @set_dialog_branch('group_selection', reset_attempt=False)
-    async def ask_group(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def ask_group(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', group_search: List[str] = None):
         institute = context.user_data.get("selected_institute")
         course = context.user_data.get("selected_course")
 
-        groups = list(GroupModule.group_ids[institute][course])
+        if group_search is None:
+            groups = list(GroupModule.group_ids[institute][course])
+        else:
+            groups = [group_name for group_name in group_search]
+
+            if len(groups) == 1:
+                await self.selection_group(update, context, groups_search=groups)
+                return
 
         buttons = [
             [
@@ -156,7 +180,8 @@ class GroupModule(BaseModule):
 
 
     # * ____________________________________________________________
-    # * |               Message handlers                            |)
+    # * |               Message handlers                            |
+    # ! Костыльно
     async def handle_group_selection(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         # Выбор института
         if context.user_data.get("selected_institute") is None:
@@ -172,12 +197,20 @@ class GroupModule(BaseModule):
 
 
     #* ---------- Select institute
-    @ensure_dialog_branch('group_selection')
+    @ensure_user_settings()
+    @ensure_dialog_branch('institute_selection')
     async def selection_institute(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
 
-        if user_input not in self.group_ids.keys():
+        groups_search = self.search_group_by_name(user_input)
 
+        if len(groups_search) >= 1:
+            await self.ask_group(update, context, groups_search)
+            context.user_data["selected_institute"] = 'Не выбран'
+            context.user_data["selected_course"] =  'Не выбран'
+            return True
+
+        elif user_input not in self.group_ids.keys():
             await update.message.reply_text(
                 messages.institute_wrong_choice,
             )
@@ -193,7 +226,7 @@ class GroupModule(BaseModule):
 
 
     #* ---------- Select course
-    @ensure_dialog_branch('group_selection')
+    @ensure_dialog_branch('course_selection')
     async def selection_course(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_input = update.message.text
 
@@ -219,26 +252,25 @@ class GroupModule(BaseModule):
     #* ---------- Select group
     @ensure_user_settings()
     @ensure_dialog_branch('group_selection', stop_after=True)
-    async def selection_group(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def selection_group(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', groups_search : List[str]= None):
         user: UserModel = context.user_data.get("user_model")
         user_input = update.message.text
 
         institute = context.user_data["selected_institute"]
         course = context.user_data["selected_course"]
-        groups = self.group_ids[institute][course]
 
-        groups_search = Group.find_group_by_name(groups=[group for group in groups], group_name=user_input)
+        if groups_search is None:
+            groups_search = self.search_group_by_name(user_input) # Group.find_group_by_name(groups=[group for group in groups], group_name=user_input)
 
+        if len(groups_search) == 0:
+            await update.message.reply_text(
+                messages.group_wrong_choice,
+            )
+            return
 
-        if groups.get(user_input) is not None:
-            group_id = groups[user_input]
-
-        elif len(groups_search) == 1:
-            group_id = groups[groups_search[0]]
-            user_input = groups_search[0]
-
-        elif len(groups_search) > 1:
-            buttons = [[KeyboardButton(group)] for group in groups_search]
+        if len(groups_search) > 1:
+            groups = [group_name for group_name in groups_search]
+            buttons = [[KeyboardButton(group)] for group in groups]
             reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
 
             await update.message.reply_text(
@@ -247,18 +279,26 @@ class GroupModule(BaseModule):
             )
             # Коммент ниже
             return dict(stop_dialog=False)
-        else:
-            await update.message.reply_text(
-                messages.group_wrong_choice,
-            )
-            return
+
+
+        #? if len(groups_search) == 1
+        slug = slugify(groups_search[0])
+        group: Dict[str, Any] = self.groups.get(slug, {})
+
+        group_id = group.get('group_id')
+        course = group.get('course')
+        institute = group.get('institute')
+
+
 
         context.user_data["selected_group"] = group_id
+        context.user_data["selected_institute"] = institute
+        context.user_data["selected_course"] = course
 
         user.set_group(group_id)
 
         await update.message.reply_text(
-            messages.result_choices(institute, course, user_input),
+            messages.result_choices(institute, course, groups_search[0]),
             reply_markup=ReplyKeyboardRemove()
         )
 
@@ -301,3 +341,25 @@ class GroupModule(BaseModule):
         return True
 
     # * |___________________________________________________________|
+
+
+    def search_group_by_name(self, user_input: str, course: str = None, institute: str = None) -> List[str]:
+        slug = slugify(user_input)
+        result = []
+
+
+        for group_key in self.group_keys:
+            if slug in group_key:
+                group: Dict[str, Any] = self.groups[group_key]
+                group_name = group.get('group_name')
+
+                if group_name:
+                    if course is not None and group.get('course') != course:
+                        continue
+                    if institute is not None and group.get('institute') != institute:
+                        continue
+
+                    result.append(group_name)
+
+
+        return result

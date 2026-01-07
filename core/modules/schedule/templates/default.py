@@ -39,17 +39,15 @@ class DefaultTemplate(BaseTemplate):
         message = ""
         group = data.get('group', '')
         date = data.get('date', '')
-        week_number = data.get('week_number', 0)
         week_day = data.get('week_day', '')
         lessons = data.get('lessons', [])
 
         # Prepare
-        week_odd_even = "Нечётная" if week_number % 2 != 0 else "Чётная"
         weekday_name = self.get_weekday_name(week_day)
 
         # Create message
         message += (
-            f"{self.header_component(group, week_odd_even, date)}"
+            f"{self.header_component(group, date)}"
             "\n\n"
             f"{self.weekday_name_component(weekday_name)}"
             "\n"

@@ -10,23 +10,30 @@ from telegram.ext import filters
 
 from telegram.error import BadRequest
 
+
 #* Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
 from core.models.user import User
-from core.modules.base.messages import get_commands_text, start_text
-from core.modules.reminder.module import ReminderModule
-from core.settings.commands import CommandNames
 
 from core.modules.base import BaseModule
+from core.modules.base.messages import get_commands_text, start_text
 from core.modules.base.decorators import ensure_user_settings
-
-from core.modules.group.module import GroupModule
-from core.modules.schedule.module import ScheduleModule
 
 from core.modules.start import messages
 from core.modules.reminder import messages as reminder_messages
+
+from core.settings.commands import CommandNames
+
+
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.modules.reminder.module import ReminderModule
+    from core.modules.group.module import GroupModule
+    from core.modules.schedule.module import ScheduleModule
+
 
 
 log = get_logger()
@@ -57,9 +64,8 @@ class StartModule(BaseModule):
 
 
 
-    @classmethod
-    async def handle_inline_commands(cls, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        MENU_COMMANDS = cls.get_menu_commands(context)
+    async def handle_inline_commands(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        MENU_COMMANDS = self.get_menu_commands(context)
 
         query = update.callback_query
         await query.answer()
@@ -71,10 +77,12 @@ class StartModule(BaseModule):
             command: func for command, _, func in MENU_COMMANDS
         }
 
-        # !КОСТЫЛЬ
+        # !КОСТЫЛЬ, почти
+        reminderModule: ReminderModule = self.manager.get_module('reminder')
+
         handler_map.update({
-            CommandNames.SET_REMINDER: ReminderModule.ask_reminder_time,
-            CommandNames.SHOW_REMINDER: ReminderModule.show_reminder_info,
+            CommandNames.SET_REMINDER: reminderModule.ask_reminder_time,
+            CommandNames.SHOW_REMINDER: reminderModule.show_reminder_info,
         })
 
 
@@ -82,7 +90,7 @@ class StartModule(BaseModule):
             await handler_map[command](update, context)
 
         elif command == 'menu':
-            await cls.get_menu(update, context)
+            await self.get_menu(update, context)
 
 
 
@@ -121,35 +129,46 @@ class StartModule(BaseModule):
         await cls.show_command_keyboard(update, context)
 
 
-    @classmethod
-    def get_menu_commands(cls, context: 'ContextTypes.DEFAULT_TYPE'):
+
+    def get_menu_commands(self, context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
 
-        # ! КОСТЫЛЬ - название команд отличается от CommandNames
+        scheduleModule: ScheduleModule = self.manager.get_module('schedule')
+        groupModule: GroupModule = self.manager.get_module('group')
+
         MENU_COMMANDS = (
+            # ROW
             (None, None, None),
-            ("help", "Помощь", cls.help),
+            (CommandNames.HELP, "Помощь", self.help),
             (None, None, None),
 
-            ("schedule", "Расписание", ScheduleModule.schedule_handler),
-            ("today", "На сегодня", ScheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", ScheduleModule.get_schedule_week),
-            ("tomorrow", "На завтра", ScheduleModule.get_schedule_next_day),
+            # ROW
+            (CommandNames.SCHEDULE, "Расписание", scheduleModule.schedule_handler),
+            (CommandNames.SCHEDULE, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", scheduleModule.get_schedule_week),
+            (CommandNames.SCHEDULE, "На завтра", scheduleModule.get_schedule_next_day),
 
-            ("set_group", "Установить группу", GroupModule.ask_institute),
+            # ROW
             (None, None, None),
-            ("set_subgroup", "Установить подгруппу", GroupModule.ask_subgroup),
+            (CommandNames.DATE, "Календарь", scheduleModule.ask_date),
+            (None, None, None),
 
-            ("settings", "Настройки", cls.send_settings),
+            # ROW
+            (CommandNames.SET_GROUP, "Установить группу", groupModule.ask_institute),
+            (None, None, None),
+            (CommandNames.SET_SUBGROUP, "Установить подгруппу", groupModule.ask_subgroup),
+
+            # ROW
+            (CommandNames.SETTINGS, "Настройки", self.send_settings),
         )
 
         return MENU_COMMANDS
 
 
-    @classmethod
+
     @ensure_user_settings(need_update=True)
-    async def get_menu(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def get_menu(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
-        MENU_COMMANDS = cls.get_menu_commands(context)
+        MENU_COMMANDS = self.get_menu_commands(context)
 
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd]
@@ -167,8 +186,6 @@ class StartModule(BaseModule):
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
-        # _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
-
 
         SETTINGS_COMMANDS = (
             None,

@@ -9,8 +9,12 @@ from telegram.ext import Application, BaseHandler, ContextTypes
 
 
 # * Core ________________________________________________________________________
+from core.modules.base import messages
 from core.modules.base.decorators import ensure_user_settings
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from core.modules import ModuleManager
 
 strf_time_mask = "%Y-%m-%d"
 
@@ -18,11 +22,13 @@ strf_time_mask = "%Y-%m-%d"
 # * MODULE ___________________________________________________________________
 class BaseModule:
     application: Application = None
+    manager: 'ModuleManager' = None
 
     HANDLERS: Tuple[BaseHandler[Any, Any, Any]]
 
-    def __init__(self, application: Application) -> None:
+    def __init__(self, application: Application, module_manager: 'ModuleManager') -> None:
         self.application = application
+        self.manager = module_manager
 
         self.setup()
 
@@ -180,7 +186,7 @@ class BaseModule:
     # * _____________________________________________________________
     # * |               Callback handlers                            |
     @classmethod
-    async def handle_calendar_callback(cls, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_calendar_callback(cls, update: Update, context: 'ContextTypes.DEFAULT_TYPE', hide_after=False):
         """Обработчик нажатий на кнопки календаря"""
         query = update.callback_query
         await query.answer()
@@ -189,7 +195,18 @@ class BaseModule:
         calendar, value = query_data.split('&')
 
         if calendar == 'day':
-            await query.edit_message_text(f"Вы выбрали дату: {value}")
+            date = datetime.datetime.strptime(value, strf_time_mask).strftime('%d.%m')
+
+            if hide_after:
+                await query.edit_message_text(
+                    messages.calendar_chosen_text(date)
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=update.effective_user.id,
+                    text=messages.calendar_chosen_text(date)
+                )
+            return value
 
         elif calendar == 'month':
             year_str, month_str = value.split("_")

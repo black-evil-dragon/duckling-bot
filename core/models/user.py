@@ -1,12 +1,16 @@
-from typing import Any
 from sqlalchemy import Boolean, Column, Integer, String, JSON
+
 from db.core import models
 
 
 from utils.logger import get_logger
+from typing import Any
+
 
 
 log = get_logger()
+
+
 
 class User(models.BaseModel):
     user_id = Column(Integer, unique=True)

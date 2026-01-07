@@ -7,6 +7,7 @@ import telegram
 
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
+from core.models.user import User
 from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings
 from core.modules.group.module import GroupModule
@@ -39,13 +40,9 @@ class ScheduleModule(BaseModule):
     session: requests.Session = None
 
 
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup(self):
         self.session = self.application.bot_data.get('session')
 
-
-    def setup(self):
         # * Чисто экспериментальный код, думаю как можно сделать лучше
         self.HANDLERS = (
             # Command
@@ -58,7 +55,7 @@ class ScheduleModule(BaseModule):
             # Callback
             CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day#"),
             CallbackQueryHandler(self.schedule_week_callback, pattern="^schedule_week#"),
-            CallbackQueryHandler(BaseModule.handle_calendar_callback, pattern="^calendar_nav#") # Важно для использования календаря
+            CallbackQueryHandler(self.handle_calendar_callback, pattern="^calendar_nav#")
         )
 
         self.application.add_handlers(self.HANDLERS)
@@ -265,6 +262,25 @@ class ScheduleModule(BaseModule):
                 additional_buttons=additional_buttons
             )
         )
+
+
+    def generate_schedule_content(self, user: User, date: DateType):
+        args = dict(
+            session=self.session,
+            group_id=user.group_id,
+            date_start=date,
+            user_data=dict(
+                user_id=user.user_id,
+                **user.get_selected_data(),
+                user_settings=user.get_user_settings(),
+            )
+        )
+
+
+        schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
+        message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=date)
+
+        return message
     # * |___________________________________________________________|
 
 
@@ -347,7 +363,7 @@ class ScheduleModule(BaseModule):
 
 
 
-    @staticmethod
+    @classmethod
     @ensure_user_settings()
     async def get_schedule_week(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
@@ -396,7 +412,25 @@ class ScheduleModule(BaseModule):
 
 
     # * ____________________________________________________________
-    # * |               Callback handlers                            |
+    # * |               Callback handlers                           |
+    @ensure_user_settings()
+    async def handle_calendar_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        date_str = await super().handle_calendar_callback(update, context) # Важно для использования календаря
+
+        if date_str is not None:
+            date = datetime.strptime(date_str, strf_time_mask)
+            user: User = context.user_data.get('instance')
+
+
+            content = self.generate_schedule_content(user, date)
+
+            await context.bot.send_message(
+                chat_id=user.user_id,
+                **content
+            )
+
+
+
     @ensure_user_settings()
     async def schedule_week_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         session: 'Session' = context.bot_data.get('session')
@@ -435,7 +469,6 @@ class ScheduleModule(BaseModule):
         message = ScheduleModule.get_message_schedule(schedule, is_daily=False, date=date_start)
 
         await query.edit_message_text(**message)
-
 
 
 

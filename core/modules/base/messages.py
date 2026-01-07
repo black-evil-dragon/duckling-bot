@@ -31,8 +31,12 @@ start_text = (
 
 
 
+
 # * TEMPLATES ___________________________________________
 def get_commands_text(commands: list[str] = COMMANDS):
     return '\n'.join((
         f'/{command} - {description}' for command, description in commands
     ))
+
+
+calendar_chosen_text = lambda date : f"Выбрана дата {date}"  # noqa: E731

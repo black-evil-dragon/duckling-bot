@@ -36,15 +36,12 @@ class ReminderModule(BaseModule):
     cache_lock = asyncio.Lock()
 
     user_jobs: Dict[str, "Job"] = {}
-    application: "Application" = None
+
     instance: "ReminderModule" = None
     session: "requests.Session" = None
 
 
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def setup(self):
         self.user_jobs = {}
         self.__class__.instance = self
         self.__class__.application = self.application
@@ -53,8 +50,6 @@ class ReminderModule(BaseModule):
         self.application.job_queue.run_once(self.restore_reminders, when=2)
 
 
-
-    def setup(self):
         self.application.add_handler(CommandHandler(CommandNames.SHOW_REMINDER, self.show_reminder_info))
         self.application.add_handler(CommandHandler(CommandNames.SET_REMINDER, self.ask_reminder_time))
 
@@ -233,7 +228,8 @@ class ReminderModule(BaseModule):
                 return self.content_cache[cache_key]
 
         # Генерируем новый контент
-        content = self.generate_broadcast_content(user, current_date)
+        scheduleModule: ScheduleModule = self.manager.get_module('schedule')
+        content = scheduleModule.generate_schedule_content(user, current_date)
 
         # Сохраняем в кеш
         if content:
@@ -265,6 +261,7 @@ class ReminderModule(BaseModule):
                 log.debug(f"Очищен кеш: удалено {len(keys_to_remove)} старых записей")
 
 
+    # ! DEPRECATED
     def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:
         args = dict(
             session=self.session,
@@ -283,7 +280,7 @@ class ReminderModule(BaseModule):
 
 
         return message
-
+    # ! END DEPRECATED
 
 
     # *                  Reminder logic
