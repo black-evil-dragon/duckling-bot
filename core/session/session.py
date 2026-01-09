@@ -51,11 +51,13 @@ class Session:
             self.get_all_groups()
 
             # * Tests
-            # print(self.session.post('http://127.0.0.1:8000/api/schedule/period/', json=dict(
-            #     group_id=233,
-            #     date='2025-09-08',
-            #     # date_end="2026-01-10"
-            # )).json())
+            print(self.session.post('http://127.0.0.1:8000/api/schedule/period/', json=dict(
+                target_type='teacher',
+                teacher_id=299,
+                date_start='2026-01-05',
+                date_end="2026-01-10"
+            )).json())
+            exit()
             # # print()
 
             # print(self.session.post('http://127.0.0.1:8000/api/schedule/day/', json=dict(

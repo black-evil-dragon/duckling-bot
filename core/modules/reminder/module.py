@@ -142,13 +142,13 @@ class ReminderModule(BaseModule):
 
         subscriber: "Subscriber" = Subscriber.objects.update_or_create(
             user_id=user.id,
-            defaults=dict(
-                schedule_time=time,
-                is_active=user_settings.get('reminder', False),
-            )
+            defaults=dict(schedule_time=time)
         )
 
-        await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False))
+        user_settings['reminder'] = True
+        user.set_user_settings(user_settings)
+
+        await self.sign_subscriber(subscriber, True)
 
 
         # * Return
@@ -287,23 +287,21 @@ class ReminderModule(BaseModule):
     # * | sign_subscriber __________________________________________|
     # ? | Подписываем пользователя на интервальное событие
     # ? | или отписываем
-    @classmethod
-    async def sign_subscriber(cls, subscriber: "Subscriber", is_sign: bool, user: "User" = None):
-        if cls.instance is None:
-            raise RuntimeError("ReminderModule not initialized")
-
-        instance: 'ReminderModule' = cls.instance
+    async def sign_subscriber(self, subscriber: "Subscriber", is_sign: bool, user: "User" = None):
         reminder_time = subscriber.schedule_time
 
+        log.debug(f'Подписываем пользователя {subscriber.user_id} на подписку {is_sign}')
+        subscriber.set_active(is_sign)
+
         if not is_sign:
-            await instance.stop_reminder_for_user(subscriber)
+            await self.stop_reminder_for_user(subscriber)
             return
 
         if not reminder_time:
-            await cls.ask_reminder_time()
+            await self.ask_reminder_time()
             return
 
-        await instance.set_reminder_for_user(subscriber, reminder_time, user)
+        await self.set_reminder_for_user(subscriber, reminder_time, user)
 
 
     # * | Set reminder _____________________________________________|

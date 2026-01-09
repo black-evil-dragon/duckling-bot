@@ -144,8 +144,8 @@ class StartModule(BaseModule):
 
             # ROW
             (CommandNames.SCHEDULE, "Расписание", scheduleModule.schedule_handler),
-            (CommandNames.SCHEDULE, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", scheduleModule.get_schedule_week),
-            (CommandNames.SCHEDULE, "На завтра", scheduleModule.get_schedule_next_day),
+            (CommandNames.TODAY, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", scheduleModule.get_schedule_week),
+            (CommandNames.TOMORROW, "На завтра", scheduleModule.get_schedule_next_day),
 
             # ROW
             (None, None, None),
@@ -208,20 +208,25 @@ class StartModule(BaseModule):
             ),
 
 
-            None,
+            None,None,
             (
                 f"settings#bool${not user_settings.get('reminder', False)}$reminder",
                 f"📢 Рассылка {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
-            None,
 
             None,
             (f"delegate#{CommandNames.SET_REMINDER}", "⏰ Выбрать время"),
             (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
 
-            None,
+            None,None,
+            ("ignore", "💬 Формат расписания"),
+
+            ("settings#str$default$message_template", f"📚 Обычный {'✅' if user_settings.get('message_template', 'default') == 'default' else '❌'}"),
+            ("settings#str$compact$message_template", f"📔 Компакт. {'✅' if user_settings.get('message_template', 'default') == 'compact' else '❌'}"),
+            ("settings#str$minimal$message_template", f"📄 Мин. {'✅' if user_settings.get('message_template', 'default') == 'minimal' else '❌'}"),
+
+            None,None,
             (f"delegate#{CommandNames.MENU}", "📍 Меню"),
-            None,
         )
 
         return InlineKeyboardMarkup([
@@ -267,9 +272,8 @@ class StartModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Callback handlers                            |
-    @staticmethod
     @ensure_user_settings(need_update=True)
-    async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def handle_settings(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         query = update.callback_query
 
@@ -290,24 +294,23 @@ class StartModule(BaseModule):
         # | if callback_checker is not None:
         # |     callback_checker(command_info)
 
+        # * Обновление данных
+        user_settings = user.set_setting(setting, value, value_type)
+        context.user_data.update(dict(user_settings=user_settings))
+
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
-            await GroupModule.ask_subgroup(update, context)
+            groupModule: GroupModule = self.manager.get_module('group')
+            await groupModule.ask_subgroup(update, context)
 
         if setting == 'reminder':
-            subscriber: "Subscriber" = Subscriber.objects.update_or_create(
-                user_id=user.id,
-                # defaults=dict(
-                #     is_active=user_settings.get('reminder', False)
-                # )
-            )
+            subscriber: "Subscriber" = Subscriber.objects.update_or_create(user_id=user.id)
 
             if context.user_data.get('selected_group') is None:
                 await context.bot.send_message(
                     chat_id=user.user_id,
                     text=reminder_messages.group_is_not_chosen,
                 )
-                # await GroupModule.ask_institute(update, context)
                 return
 
 
@@ -316,22 +319,17 @@ class StartModule(BaseModule):
                     chat_id=user.user_id,
                     text=reminder_messages.time_is_not_chosen,
                 )
-                # await ReminderModule.ask_reminder_time(update, context)
                 return
 
+            reminderModule: ReminderModule = self.manager.get_module('reminder')
 
-            await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
-
-
-        # * Обновление данных
-        user_settings = user.set_setting(setting, value, value_type)
-        context.user_data.update(dict(user_settings=user_settings))
+            await reminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
 
 
         # !КОСТЫЛЬ.. Наверное
         # См метод send_settings
         # * Надстройка для отправки своего markup и text
-        reply_markup = StartModule.get_settings(update, context)
+        reply_markup = self.get_settings(update, context)
         text = messages.settings_text
 
         if context.user_data.get('send_custom_settings', False):
@@ -353,7 +351,6 @@ class StartModule(BaseModule):
 
         except BadRequest:
             log.error('Ошибка при редактировании сообщения, возможно, сообщение не изменено.')
-            # log.debug('Текст ошибки:', exc_info=True)
             return
 
     # * |___________________________________________________________|

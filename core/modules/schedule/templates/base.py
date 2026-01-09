@@ -27,7 +27,7 @@ class BaseTemplate:
         first_date: str,
         last_date: str = None
     ) -> str:
-        week_even = datetime.datetime.strptime(first_date, strf_time_mask).isocalendar().week % 2 == 0
+        week_even = datetime.datetime.strptime(first_date, strf_time_mask).isocalendar().week % 2 != 0
 
         first_date = datetime.datetime.strptime(first_date, strf_time_mask).strftime("%d.%m")
 
@@ -51,7 +51,8 @@ class BaseTemplate:
 
     def weekday_component(self,
         date: str,
-        day_key: int = None
+        day_key: int = None,
+        bold = True
     ):
         weekday = self.get_weekday_name(day_key)
         date = datetime.datetime.strptime(date, strf_time_mask).strftime("%d.%m")
@@ -59,13 +60,14 @@ class BaseTemplate:
         if day_key:
             weekday += f" ({date})"
 
-        return self.weekday_name_component(weekday)
+        return self.weekday_name_component(weekday) if bold else weekday
 
 
     def lesson_component(self, lesson: Dict[str, str])  -> str:
         title = lesson.get('title', '')
         time = lesson.get('time', '')
         teacher = lesson.get('teacher', '')
+        teacher_degree = lesson.get('teacher_degree', '')
         lesson_type = lesson.get('type', '')
         location = lesson.get('location', '')
         subgroup = lesson.get('subgroup', ' ') or ' '
@@ -76,9 +78,9 @@ class BaseTemplate:
 
         return (
             f"┌ 🕒 <b>{time} {subgroup}</b>\n"
-            f"├ 📚 {title}\n"
-            f"├ 🎯 {lesson_type}\n"
-            f"├ 👨‍🏫 {teacher}\n"
+            f"│ 📚 {title}\n"
+            f"│ 🎯 {lesson_type}\n"
+            f"│ 👨‍🏫 {teacher_degree} {teacher}\n"
             f"└ 📍 {location}"
         )
 
@@ -113,8 +115,16 @@ class BaseTemplate:
             'семинар': 'СЕМ',
             'экзамен': 'ЭКЗ',
             'зачет': 'ЗАЧ',
+            'зачёт': 'ЗАЧ',
             'диф.зачет': 'ДЗАЧ',
             'консультация': 'КОНС',
         }
         return short_lesson_types.get(lesson_type, lesson_type)
+
+    def get_short_lesson_name(self, lesson) -> str:
+        short_lesson_names = {
+            'Элективные дисциплины по физической культуре и спорту': 'Физкультура (электив)'
+        }
+
+        return short_lesson_names.get(lesson, lesson)
 
