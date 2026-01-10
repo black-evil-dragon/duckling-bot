@@ -34,7 +34,7 @@ class Database:
                     expire_on_commit=expire_on_commit,
                 )
             )
-            
+
             Base: "DeclarativeBase" = declarative_base()
             Base.metadata.create_all(cls._engine)
 

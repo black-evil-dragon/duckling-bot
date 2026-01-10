@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, JSON
+from sqlalchemy import Boolean, Column, Engine, Inspector, Integer, String, JSON, inspect, text
 
 from db.core import models
 
@@ -21,6 +21,7 @@ class User(models.BaseModel):
     last_name = Column(String, default="")
     username = Column(String, default="")
 
+    target_id = Column(Integer, default=None) #* MIGRATION!
     group_id = Column(Integer, default=None)
     subgroup_id = Column(Integer, default=None)
     user_settings = Column(JSON, default={})
@@ -31,6 +32,40 @@ class User(models.BaseModel):
             return f"Пользователь {self.first_name} {self.last_name}"
         else:
             return f"Пользователь {self.first_name}"
+
+
+
+    # * MIGRATIONS FIX --- TEMP
+    @classmethod
+    def create_all(cls):
+        return super().create_all(cls.apply_migration)
+
+    @classmethod
+    def apply_migration(cls, engine: Engine):
+        """Применяет необходимые миграции для таблицы."""
+
+        inspector: Inspector = inspect(engine)
+
+
+        if 'users' in inspector.get_table_names():
+            try:
+                columns = [
+                    col['name']
+                    for col in inspector.get_columns('users')
+                ]
+
+                if 'target_id' not in columns:
+                    log.info("Applying migration")
+
+                    with engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN target_id INTEGER DEFAULT NULL"))
+                        conn.commit()
+
+                    log.info("Проведена миграция: Add target_id")
+
+
+            except Exception as e:
+                log.error(f"Migration failed: {e}")
 
 
     # * SERIALIZE DATA
@@ -44,21 +79,24 @@ class User(models.BaseModel):
             **self.get_selected_data(),
             user_settings=self.get_user_settings(),
 
+            instance=self, # Лучше
             user_model=self,
-
-            # Лучше
-            instance=self
         )
 
         return user_data
 
     def get_selected_data(self):
-        # В целом сломалось все из-за этого,
-        # Люблю, что я это сделал.
         return dict(
+            selected_target=self.target_id,
             selected_group=self.group_id,
             selected_subgroup=self.subgroup_id,
         )
+
+
+    # * TARGET MANAGEMENT
+    def set_target(self, target_id: int):
+        self.target_id = target_id
+        self.save()
 
 
     # * GROUP MANAGEMENT
@@ -76,6 +114,7 @@ class User(models.BaseModel):
                 subgroup_lock=set_subgroup_lock
             ))
             self.set_user_settings(settings)
+            return # Сохранение происходит в set_user_settings
 
         self.save()
 

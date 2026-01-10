@@ -64,15 +64,13 @@ class ScheduleModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                    Utils                                  |
-    @classmethod
     def fetch_data(
-        cls,
-        session: 'requests.Session',
+        self,
         path: str,
         params: dict,
     ) -> dict:
         # log.debug(f'Отправлен запрос: {path}')
-        response = session.post(
+        response = self.session.post(
             path,
             json=params
         )
@@ -182,12 +180,10 @@ class ScheduleModule(BaseModule):
 
 
 
-    @classmethod
-    def get_schedule_by_group_id(
-        cls,
-        session: 'requests.Session',
 
-        group_id: int,
+    def get_schedule_by_target_id(
+        self,
+        target_id: int,
 
         schedule_type: str = "day",
         user_data: dict = None,
@@ -203,7 +199,7 @@ class ScheduleModule(BaseModule):
 
 
         data = dict(
-            group_id=group_id,
+            group_id=target_id,
             date_start=date_start,
             date_end=date_end,
             user_data=user_data
@@ -211,13 +207,12 @@ class ScheduleModule(BaseModule):
 
 
         request = dict(
-            session=session,
             path=f"schedule/{schedule_type}/",
-            params=cls.get_schedule_query(**data),
+            params=self.get_schedule_query(**data),
         )
 
 
-        response_data: dict = cls.fetch_data(**request)
+        response_data: dict = self.fetch_data(**request)
         data: Dict[str, Any] = response_data.get('data', {})
 
         # чуть костыльно, но норм
@@ -286,8 +281,7 @@ class ScheduleModule(BaseModule):
             is_daily = False
 
         args = dict(
-            session=self.session,
-            group_id=user.group_id,
+            target_id=user.group_id,
             schedule_type=schedule_type,
             date_start=date,
             date_end=date_end,
@@ -298,7 +292,7 @@ class ScheduleModule(BaseModule):
             )
         )
 
-        schedule: dict = self.get_schedule_by_group_id(**args)
+        schedule: dict = self.get_schedule_by_target_id(**args)
         message = self.get_message_schedule(schedule, is_daily=is_daily, date=date)
 
         return message

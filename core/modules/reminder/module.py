@@ -262,24 +262,24 @@ class ReminderModule(BaseModule):
 
 
     # ! DEPRECATED
-    def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:
-        args = dict(
-            session=self.session,
-            group_id=user.group_id,
-            date_start=current_date,
-            user_data=dict(
-                user_id=user.user_id,
-                **user.get_selected_data(),
-                user_settings=user.get_user_settings(),
-            )
-        )
+    # def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:
+    #     args = dict(
+    #         session=self.session,
+    #         group_id=user.group_id,
+    #         date_start=current_date,
+    #         user_data=dict(
+    #             user_id=user.user_id,
+    #             **user.get_selected_data(),
+    #             user_settings=user.get_user_settings(),
+    #         )
+    #     )
 
 
-        schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
-        message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=current_date)
+    #     schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
+    #     message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=current_date)
 
 
-        return message
+    #     return message
     # ! END DEPRECATED
 
 

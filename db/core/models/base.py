@@ -14,7 +14,7 @@ from sqlalchemy.ext.declarative import declared_attr
 
 
 # * Other packages ____________________________________________
-from typing import Type, TypeVar, List, Optional, Any
+from typing import Callable, Type, TypeVar, List, Optional, Any
 import logging
 
 
@@ -40,11 +40,11 @@ class BaseModel(DeclarativeBase):
             ["_" + c.lower() if c.isupper() else c for c in name]
         ).lstrip("_")
         return f"{snake_case}s"
-    
-    
+
+
 
     # * _______________________________________________________
-    # * |                   Classes              
+    # * |                   Classes
     class Meta:
         table_name: Optional[str] = None
 
@@ -58,7 +58,7 @@ class BaseModel(DeclarativeBase):
         primary_key=True,
         autoincrement=True
     )
-    
+
     created_at = Column(
         DateTime(timezone=True),
         default=func.now(),
@@ -71,18 +71,18 @@ class BaseModel(DeclarativeBase):
         onupdate=func.now(),
         nullable=False
     )
-    
-    
+
+
 
     # * _______________________________________________________
-    # * |                   Class methods    
+    # * |                   Class methods
     def __repr__(self):
         cls_name = self.__class__.__name__
         fields = []
-    
+
         if hasattr(self, "__str__"):
             fields.append(f"{self.__str__()}")
-            
+
         fields_str = ", ".join(fields)
         return f"<{cls_name}: {fields_str}>"
 
@@ -97,18 +97,18 @@ class BaseModel(DeclarativeBase):
             return self.id == other.id
         return False
 
-    
-    
-    
+
+
+
     # * _______________________________________________________
-    # * |                   Management          
+    # * |                   Management
     objects = ManagerDescriptor(BaseManager)
-    
+
     @property
     def pk(self):
         return self.id
-    
-    
+
+
     def to_dict(self) -> dict:
         return {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
 
@@ -118,28 +118,29 @@ class BaseModel(DeclarativeBase):
             session.flush()
             session.refresh(merged_obj)
             return merged_obj
-        
-    def update(self, **fields) -> Optional[T]:        
+
+    def update(self, **fields) -> Optional[T]:
         with Database.session_scope() as session:
             for key, value in dict(**fields).items():
                 setattr(self, key, value)
-                
+
             merged_obj = session.merge(self)
             session.flush()
             session.refresh(merged_obj)
 
             return merged_obj
 
-        
-    # TRASH ----------
-        
-    
+
+
     @classmethod
-    def create_all(cls) -> None:
+    def create_all(cls, callback_migration: Callable = None) -> None:
         """Создать все таблицы в БД."""
         engine = Database.get_engine()
         cls.metadata.create_all(bind=engine)
-        
+
+        if callback_migration is not None:
+            callback_migration(engine)
+
         log.debug(f'+ Созданы таблицы: {cls}')
 
 
