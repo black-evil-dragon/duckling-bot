@@ -62,11 +62,18 @@ def get_refresh_button(callback_data: str) -> InlineKeyboardButton:
 def get_schedule_button() -> InlineKeyboardButton:
     return InlineKeyboardButton("📅 Сегодня", callback_data=f"delegate#{CommandNames.SCHEDULE}")
 
+def get_target_buttons() -> InlineKeyboardButton:
+    return [[
+        InlineKeyboardButton("📚 Группа", callback_data=f"delegate#{CommandNames.QUICK_GROUP_SCHEDULE}"),
+        InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.QUICK_TEACHER_SCHEDULE}")
+    ]]
+
 
 # * TEXT ___________________________________________________________________
 
 # Dialog
 schedule_ask_date = "📅 Выберите дату:"
+schedule_ask_target_type = "🎯 Выберите тип расписания:"
 
 schedule_not_found = "Расписание пустое"
 schedule_without_data = f"Данные расписания отсутствуют. Запросите расписание снова /{CommandNames.SCHEDULE}"

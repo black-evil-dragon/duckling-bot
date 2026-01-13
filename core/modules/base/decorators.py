@@ -1,13 +1,21 @@
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+import telegram
+
+
 from core.models.user import User
 from core.modules.base import messages
+
+
+
 from utils.logger import get_logger
 
 from functools import wraps
-from typing import Callable, Tuple
+from typing import Any, Callable, Dict, Tuple
 
+from utils.messages import split_message
+import asyncio
 
 log = get_logger()
 
@@ -199,7 +207,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
 
 
 
-def ensure_user_settings(is_await=True, need_update=False):
+def ensure_user_settings(is_await=True, need_update=False, target_required_handler: Callable = None):
     """
 
     Загружает в контекст user_data
@@ -233,17 +241,108 @@ def ensure_user_settings(is_await=True, need_update=False):
         async def async_wrapper(*args, **kwargs):
             update, context = get_update_context(args)
             load_user_data(update, context, need_update)
+
+            success = True
+
+            # * Вообще это костыльно, так как проверять и оповещать можно в async пока что
+            if target_required_handler is not None:
+                success = await target_required_handler(update, context)
+
+                if not success: return
+
             return await func(*args, **kwargs)
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             update, context = get_update_context(args)
             load_user_data(update, context, need_update)
+
             return func(*args, **kwargs)
 
         return async_wrapper if is_await else sync_wrapper
     return decorator
 
+
+def try_send_message():
+    """
+    TODO: Задумка отлавливать слишком большие сообщения (или сломанные) и пробовать по-другому их отправить.
+    В таком случае нужно получать сообщение прежде, чем отправлять его
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            update, context = get_update_context(args)
+
+            MESSAGE_TOO_LONG = ("Message is too long", "Message_too_long")
+            MESSAGE_IS_NOT_MODIFIED = ("Message is not modified", "Message_is_not_modified")
+
+            content: Dict[str, Any]
+            callback: Callable
+
+            callback, content = await func(*args, **kwargs)
+
+            try:
+                await callback(**content)
+
+                return
+                # Test
+                # raise telegram.error.BadRequest("Message is not modified")
+
+            except telegram.error.BadRequest as exception:
+                try:
+                    str_exception = str(exception)
+
+                    if str_exception in MESSAGE_IS_NOT_MODIFIED:
+                        await context.bot.send_message(
+                            chat_id=context.user_data.get('user_id'),
+                            **content
+                        )
+                        return
+
+                    if str_exception in MESSAGE_TOO_LONG:
+                        message = content.get('text', '')
+                        parts = split_message(message, 4000)
+                        user_id = context.user_data.get('user_id')
+
+                        for i, part in enumerate(parts, 1):
+                            part_with_progress = f"({i}/{len(parts)})\n\n{part}"
+
+                            if i == len(parts):
+                                content.update(dict(
+                                    text=part_with_progress,
+                                    parse_mode='HTML',
+                                ))
+
+                                await context.bot.send_message(
+                                    chat_id=user_id,
+                                    **content,
+                                )
+                            else:
+                                await context.bot.send_message(
+                                    chat_id=user_id,
+                                    text=part_with_progress,
+                                    parse_mode='HTML',
+                                )
+                                await asyncio.sleep(.5)
+                        return
+                except Exception as error:
+                    str_exception += f'\n{str(error)}'
+
+            except Exception as error:
+                str_exception += f'\n{str(error)}'
+
+
+            await callback(
+                text=(
+                    f"{messages.unknown_error}"
+                    f"\n\nПодробная информация: {str_exception}"
+                )
+            )
+            log.error(f"Непредвиденная ошибка при отправке сообщения! ({str_exception}). [{content}]")
+
+
+        return wrapper
+    return decorator
 
 
 # ! DEPRECATED

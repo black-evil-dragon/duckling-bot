@@ -21,10 +21,18 @@ class User(models.BaseModel):
     last_name = Column(String, default="")
     username = Column(String, default="")
 
-    target_id = Column(Integer, default=None) #* MIGRATION!
+    teacher_id = Column(Integer, default=None) #* MIGRATION!
     group_id = Column(Integer, default=None)
     subgroup_id = Column(Integer, default=None)
+
     user_settings = Column(JSON, default={})
+
+
+    DEFAULT_USER_SETTINGS = dict(
+        reminder=False,
+        message_template="default",
+        subgroup_lock=True,
+    )
 
 
     def __str__(self):
@@ -54,14 +62,14 @@ class User(models.BaseModel):
                     for col in inspector.get_columns('users')
                 ]
 
-                if 'target_id' not in columns:
+                if 'teacher_id' not in columns:
                     log.info("Applying migration")
 
                     with engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE users ADD COLUMN target_id INTEGER DEFAULT NULL"))
+                        conn.execute(text("ALTER TABLE users ADD COLUMN teacher_id INTEGER DEFAULT NULL"))
                         conn.commit()
 
-                    log.info("Проведена миграция: Add target_id")
+                    log.info("Проведена миграция: Add teacher_id")
 
 
             except Exception as e:
@@ -87,15 +95,15 @@ class User(models.BaseModel):
 
     def get_selected_data(self):
         return dict(
-            selected_target=self.target_id,
+            selected_teacher=self.teacher_id,
             selected_group=self.group_id,
             selected_subgroup=self.subgroup_id,
         )
 
 
-    # * TARGET MANAGEMENT
-    def set_target(self, target_id: int):
-        self.target_id = target_id
+    # * TEACHER MANAGEMENT
+    def set_teacher(self, teacher_id: int):
+        self.teacher_id = teacher_id
         self.save()
 
 
@@ -123,7 +131,7 @@ class User(models.BaseModel):
     def get_user_settings(self):
         try:
             if not self.user_settings:
-                return {}
+                return dict()
 
             return self.user_settings
         except Exception:

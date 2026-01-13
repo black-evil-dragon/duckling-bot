@@ -79,10 +79,14 @@ class StartModule(BaseModule):
 
         # !КОСТЫЛЬ, почти
         reminderModule: ReminderModule = self.manager.get_module('reminder')
+        scheduleModule: ScheduleModule = self.manager.get_module('schedule')
 
         handler_map.update({
             CommandNames.SET_REMINDER: reminderModule.ask_reminder_time,
             CommandNames.SHOW_REMINDER: reminderModule.show_reminder_info,
+
+            CommandNames.QUICK_GROUP_SCHEDULE: scheduleModule.get_quick_group_schedule,
+            # CommandNames.QUICK_TEACHER_SCHEDULE: scheduleModule.get_quick_teacher_schedule,
         })
 
 
@@ -135,11 +139,12 @@ class StartModule(BaseModule):
 
         scheduleModule: ScheduleModule = self.manager.get_module('schedule')
         groupModule: GroupModule = self.manager.get_module('group')
+        reminderModule: ReminderModule = self.manager.get_module('reminder')
 
         MENU_COMMANDS = (
             # ROW
             (None, None, None),
-            (CommandNames.HELP, "Помощь", self.help),
+            (CommandNames.HELP, "📄 Помощь", self.help),
             (None, None, None),
 
             # ROW
@@ -149,7 +154,17 @@ class StartModule(BaseModule):
 
             # ROW
             (None, None, None),
-            (CommandNames.DATE, "Календарь", scheduleModule.ask_date),
+            (CommandNames.DATE, "🗓️ Календарь", scheduleModule.ask_date),
+            (None, None, None),
+
+            # ROW
+            (None, None, None),
+            (CommandNames.QUICK_SCHEDULE, "🔍 Быстрый поиск", scheduleModule.ask_target_type),
+            (None, None, None),
+
+            # ROW
+            (None, None, None),
+            (CommandNames.SHOW_REMINDER, "📢 Рассылка", reminderModule.show_reminder_info),
             (None, None, None),
 
             # ROW
@@ -158,7 +173,7 @@ class StartModule(BaseModule):
             (CommandNames.SET_SUBGROUP, "Установить подгруппу", groupModule.ask_subgroup),
 
             # ROW
-            (CommandNames.SETTINGS, "Настройки", self.send_settings),
+            (CommandNames.SETTINGS, "⚙️ Настройки", self.send_settings),
         )
 
         return MENU_COMMANDS
@@ -214,9 +229,8 @@ class StartModule(BaseModule):
                 f"📢 Рассылка {'✅' if user_settings.get('reminder', False) else '❌'}",
             ),
 
-            None,
-            (f"delegate#{CommandNames.SET_REMINDER}", "⏰ Выбрать время"),
-            (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
+
+
 
             None,None,
             ("ignore", "💬 Формат расписания"),
@@ -224,6 +238,10 @@ class StartModule(BaseModule):
             ("settings#str$default$message_template", f"📚 Обычный {'✅' if user_settings.get('message_template', 'default') == 'default' else '❌'}"),
             ("settings#str$compact$message_template", f"📔 Компакт. {'✅' if user_settings.get('message_template', 'default') == 'compact' else '❌'}"),
             ("settings#str$minimal$message_template", f"📄 Мин. {'✅' if user_settings.get('message_template', 'default') == 'minimal' else '❌'}"),
+
+            None,
+            ("settings#str$student$target_type", f"Группа {'✅' if user_settings.get('target_type', 'student') == 'student' else '❌'}"),
+            ("settings#str$teacher$target_type", f"Преподаватель {'✅' if user_settings.get('target_type', 'student') == 'teacher' else '❌'}"),
 
             None,None,
             (f"delegate#{CommandNames.MENU}", "📍 Меню"),
@@ -287,17 +305,6 @@ class StartModule(BaseModule):
         value_type, value, setting = command.split('$')
 
 
-        # * Особенности поведения
-        # !КОСТЫЛЬ
-        # В теории, это надо вынести в отдельный метод
-        # Тогда здесь можно было бы написать типо
-        # | if callback_checker is not None:
-        # |     callback_checker(command_info)
-
-        # * Обновление данных
-        user_settings = user.set_setting(setting, value, value_type)
-        context.user_data.update(dict(user_settings=user_settings))
-
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             groupModule: GroupModule = self.manager.get_module('group')
@@ -313,7 +320,6 @@ class StartModule(BaseModule):
                 )
                 return
 
-
             if subscriber.schedule_time is None:
                 await context.bot.send_message(
                     chat_id=user.user_id,
@@ -321,6 +327,14 @@ class StartModule(BaseModule):
                 )
                 return
 
+
+        # * Обновление данных
+        user_settings = user.set_setting(setting, value, value_type)
+        context.user_data.update(dict(user_settings=user_settings))
+
+
+        # * Пост проверки
+        if setting == 'reminder':
             reminderModule: ReminderModule = self.manager.get_module('reminder')
 
             await reminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)

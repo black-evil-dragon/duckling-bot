@@ -6,7 +6,7 @@ unknown_error = (
     "Непредвиденная ошибка. Попробуйте еще раз или сообщите об этом разработчику\n\n"
     f"/{CommandNames.START} - начало\n"
     f"/{CommandNames.HELP} - помощь\n"
-    f"/{CommandNames.MENU} - меню\n"
+    f"/{CommandNames.MENU} - меню"
 )
 
 attempts_error_message = (

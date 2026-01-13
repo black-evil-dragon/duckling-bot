@@ -1,15 +1,14 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import Update
+from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes
 
-import telegram
 
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
 from core.models.user import User
 from core.modules.base import BaseModule, strf_time_mask
-from core.modules.base.decorators import ensure_user_settings
+from core.modules.base.decorators import ensure_user_settings, try_send_message
 from core.modules.group.module import GroupModule
 
 from core.session import Session
@@ -51,6 +50,7 @@ class ScheduleModule(BaseModule):
             CommandHandler(CommandNames.TODAY, self.get_schedule_day),
             CommandHandler(CommandNames.TOMORROW, self.get_schedule_next_day),
             CommandHandler(CommandNames.DATE, self.ask_date),
+            CommandHandler(CommandNames.QUICK_SCHEDULE, self.ask_target_type),
 
             # Callback
             CallbackQueryHandler(self.schedule_day_callback, pattern="^schedule_day#"),
@@ -78,7 +78,7 @@ class ScheduleModule(BaseModule):
         try:
             response.raise_for_status()
         except Exception as error:
-            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response}. Данные запроса: {params}')
+            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response.content.decode("unicode_escape")}. Данные запроса: {params}')
 
         response_json: dict = response.json()
 
@@ -93,7 +93,8 @@ class ScheduleModule(BaseModule):
 
     @staticmethod
     def get_schedule_query(
-        group_id: int = None,
+        target_type: Literal['student', 'teacher'] = 'student',
+        target_id: int = None,
         user_data: dict = None,
         date_start: datetime = datetime.today(),
         date_end: datetime = None,
@@ -104,7 +105,8 @@ class ScheduleModule(BaseModule):
         user_settings: dict = user_data.get('user_settings', {})
 
         params = dict(
-            group_id=str(user_data.get('selected_group', None) or group_id),
+            target_type=target_type,
+            target_id=str(target_id),
             selected_lesson_type="typical",
         )
 
@@ -185,6 +187,7 @@ class ScheduleModule(BaseModule):
         self,
         target_id: int,
 
+        target_type: Literal['student', 'teacher'] = 'student',
         schedule_type: str = "day",
         user_data: dict = None,
 
@@ -199,7 +202,8 @@ class ScheduleModule(BaseModule):
 
 
         data = dict(
-            group_id=target_id,
+            target_type=target_type,
+            target_id=target_id,
             date_start=date_start,
             date_end=date_end,
             user_data=user_data
@@ -273,22 +277,32 @@ class ScheduleModule(BaseModule):
 
 
     def generate_schedule_content(self, user: User, date: DateType, date_end : DateType = None):
+        user_settings = user.get_user_settings()
+
         schedule_type = 'day'
         is_daily = True
+
+        target_id = user.group_id
+        target_type: Literal['student', 'teacher'] = user_settings.get('target_type', 'student')
 
         if date_end is not None:
             schedule_type = 'period'
             is_daily = False
 
+        if target_type == 'teacher':
+            target_id = user.teacher_id
+
+
         args = dict(
-            target_id=user.group_id,
+            target_type=target_type,
+            target_id=target_id,
             schedule_type=schedule_type,
             date_start=date,
             date_end=date_end,
             user_data=dict(
                 user_id=user.user_id,
                 **user.get_selected_data(),
-                user_settings=user.get_user_settings(),
+                user_settings=user_settings,
             )
         )
 
@@ -300,8 +314,12 @@ class ScheduleModule(BaseModule):
 
 
 
+
+
     # * ____________________________________________________________
     # * |               Command handlers                            |
+
+    # * Dialogs
     @classmethod
     async def ask_date(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
@@ -312,7 +330,17 @@ class ScheduleModule(BaseModule):
         )
 
 
+    @classmethod
+    async def ask_target_type(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        update_message = update.message or update.callback_query.message
 
+        await update_message.reply_text(
+            text=messages.schedule_ask_target_type,
+            reply_markup=InlineKeyboardMarkup(messages.get_target_buttons())
+        )
+
+
+    # * Main handlers
     @ensure_user_settings()
     async def schedule_handler(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         schedule_week = context.user_data.get('user_settings', {}).get('show_week', False)
@@ -332,60 +360,32 @@ class ScheduleModule(BaseModule):
 
 
 
-    @ensure_user_settings()
+    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @try_send_message()
     async def get_schedule_day(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        session: 'Session' = context.bot_data.get('session')
         update_message = update.message or update.callback_query.message
 
-        # Проверяем наличие сессии
-        if not session:
-            await update_message.reply_text(messages.session_error)
-            return
-
-        # Проверяем наличие группы
-        if not context.user_data.get('selected_group', False):
-            await GroupModule.ask_institute(update, context)
-            return
+        date = datetime.now().date()
+        user: User = context.user_data.get('instance')
 
 
-        try:
-            date = datetime.now().date()
-            user: User = context.user_data.get('instance')
+        if context.user_data.get('need_tomorrow', False):
+            date += timedelta(days=1)
+            context.user_data.update(dict(
+                need_tomorrow=False
+            ))
 
 
-            if context.user_data.get('need_tomorrow', False):
-                date += timedelta(days=1)
-                context.user_data.update(dict(
-                    need_tomorrow=False
-                ))
+        content = self.generate_schedule_content(user, date)
 
-
-            content = self.generate_schedule_content(user, date)
-
-            await update_message.reply_text(**content)
-
-
-        except Exception:
-            traceback.print_exc()
-            await update_message.reply_text(messages.server_error)
+        return update_message.reply_text, content
 
 
 
-    @ensure_user_settings()
+    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @try_send_message()
     async def get_schedule_week(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        session: 'Session' = context.bot_data.get('session')
-
         update_message = update.message or update.callback_query.message
-
-
-        if not session:
-            await update_message.reply_text(messages.session_error)
-            return
-
-
-        if not context.user_data.get('selected_group', False):
-            await GroupModule.ask_institute(update, context)
-            return
 
 
         try:
@@ -397,30 +397,17 @@ class ScheduleModule(BaseModule):
 
             content = self.generate_schedule_content(user, date_start, date_end)
 
-
-            try:
-                await update_message.reply_text(**content)
-
-            except telegram.error.BadRequest as exception:
-                if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
-                    log.error(f'Ошибка отправки сообщения [{exception.message}]')
-                    log.warning('Пробуем отправить еще раз!')
-
-                    await context.bot.send_message(
-                        chat_id=context.user_data.get('user_id'),
-                        **content
-                    )
-                    return
-
-                log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-
-            except Exception as exception:
-                log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-
+            return update_message.reply_text, content
 
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error, parse_mode='HTML')
+
+
+
+    async def get_quick_group_schedule(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        context.user_data['selected_callback'] = ''
+        await self.ask_date(update,context)
 
     # * |___________________________________________________________|
 
@@ -429,15 +416,11 @@ class ScheduleModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Callback handlers                           |
-    @ensure_user_settings()
+    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
     async def handle_calendar_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         date_str = await super().handle_calendar_callback(update, context) # Важно для использования календаря
 
         if date_str is not None:
-            if not context.user_data.get('selected_group', False):
-                await GroupModule.ask_institute(update, context)
-                return
-
             date = datetime.strptime(date_str, strf_time_mask)
             user: User = context.user_data.get('instance')
 
@@ -449,11 +432,9 @@ class ScheduleModule(BaseModule):
             )
 
 
-
-    @ensure_user_settings()
+    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @try_send_message()
     async def schedule_week_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        session: 'Session' = context.bot_data.get('session')
-
         query = update.callback_query
         query_data = query.data.split('#')
         query_week_number = query_data[-1]
@@ -461,49 +442,20 @@ class ScheduleModule(BaseModule):
 
         await query.answer()
 
-
-        if not session:
-            await query.edit_message_text(messages.session_error)
-            return
-
-        if not context.user_data.get('selected_group', False):
-            await GroupModule.ask_institute(update, context)
-            return
-
-
         week_number, year = query_week_number.split('.')
 
         date_start = DateType.fromisocalendar(int(year), int(week_number), 1)
         date_end = date_start + timedelta(days=5)
 
+
         content = self.generate_schedule_content(user, date_start, date_end)
 
-
-        try:
-            await query.edit_message_text(**content)
-
-        except telegram.error.BadRequest as exception:
-            if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
-                log.error(f'Ошибка отправки сообщения [{exception.message}]')
-                log.warning('Пробуем отправить еще раз!')
-
-                await context.bot.send_message(
-                    chat_id=context.user_data.get('user_id'),
-                    **content
-                )
-                return
-
-            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-
-        except Exception as exception:
-            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
+        return query.edit_message_text, content
 
 
-
-    @ensure_user_settings()
+    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @try_send_message()
     async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        session: 'Session' = context.bot_data.get('session')
-
         query = update.callback_query
         query_data = query.data.split('#')
         query_date = datetime.strptime(query_data[-1], strf_time_mask)
@@ -512,35 +464,8 @@ class ScheduleModule(BaseModule):
         await query.answer()
 
 
-        if not session:
-            await query.edit_message_text(messages.session_error)
-            return
-
-        if not context.user_data.get('selected_group', False):
-            await GroupModule.ask_institute(update, context)
-            return
-
-
         content = self.generate_schedule_content(user, query_date)
 
 
-        try:
-            await query.edit_message_text(**content)
-
-        except telegram.error.BadRequest as exception:
-            if exception.message == 'Message is not modified' or 'Message is not modified' in str(exception):
-                log.error(f'Ошибка отправки сообщения [{exception.message}]')
-                log.warning('Пробуем отправить еще раз!')
-
-                await context.bot.send_message(
-                    chat_id=context.user_data.get('user_id'),
-                    **content
-                )
-                return
-
-            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-
-        except Exception as exception:
-            log.exception(f'Неизвестная ошибка при отправке сообщения! {exception}')
-
+        return query.edit_message_text, content
     # * |___________________________________________________________|

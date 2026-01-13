@@ -69,6 +69,23 @@ class GroupModule(BaseModule):
         for key in ['selected_institute', 'selected_course', 'selected_group']:
             context.user_data[key] = None
 
+    @classmethod
+    async def check_target_id(cls, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_settings: Dict[str, Any] = context.user_data.get('user_settings', {})
+        required_field = 'selected_group'
+
+        callback = cls.ask_institute
+
+        if user_settings.get('target_type', 'student') == 'teacher':
+            required_field = 'selected_teacher'
+            callback = cls.ask_institute
+
+        if not context.user_data.get(required_field, False):
+            await callback(update, context)
+            return
+
+        return True
+
     # * |___________________________________________________________|
 
 
