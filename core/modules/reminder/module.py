@@ -13,7 +13,7 @@ from core.modules.base import BaseModule
 
 
 # * Other packages ________________________________________________________________________
-from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch
+from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch, try_send_message
 from core.modules.reminder import messages
 
 from core.modules.schedule.module import ScheduleModule
@@ -32,7 +32,7 @@ log = get_logger()
 
 
 class ReminderModule(BaseModule):
-    content_cache: Dict[Tuple["datetime.date", int, int], str] = {}
+    content_cache: Dict[Tuple["datetime.date", str, int], str] = {}
     cache_lock = asyncio.Lock()
 
     user_jobs: Dict[str, "Job"] = {}
@@ -55,7 +55,7 @@ class ReminderModule(BaseModule):
 
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_time_input),
-            group=3
+            group=4
         )
 
 
@@ -76,6 +76,7 @@ class ReminderModule(BaseModule):
     # * |               Command handlers                            |
     @classmethod
     @ensure_user_settings()
+    @try_send_message()
     async def show_reminder_info(cls, update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
         update_message = update.message or update.callback_query.message
 
@@ -100,7 +101,7 @@ class ReminderModule(BaseModule):
         ))
 
 
-        await update_message.reply_text(
+        return update_message.edit_text if update_message.from_user.id == context.bot.id else update_message.reply_text, dict(
             text=text,
             parse_mode='HTML',
             reply_markup=cls.get_reminder_markup(user_settings)
@@ -214,17 +215,22 @@ class ReminderModule(BaseModule):
 
     # Получение щакешированного контента
     async def get_cached_content(self, user: "User", current_date: "datetime.date") -> dict:
-        group_id = user.group_id
+        target_id = user.group_id
+        target_type = "student"
         subgroup_id = user.subgroup_id
 
-        cache_key = (current_date, group_id, subgroup_id)
+        if user.get_user_settings().get('target_type', 'student') == 'teacher':
+            target_type = 'teacher'
+            target_id = user.teacher_id
+
+        cache_key = (current_date, f"{target_type}_{target_id}", subgroup_id)
 
         await self.cleanup_old_cache()
 
         # Проверяем кеш
         async with self.cache_lock:
             if cache_key in self.content_cache:
-                log.debug(f"Используем кешированный контент для группы {group_id} {subgroup_id} на {current_date}")
+                log.debug(f"Используем кешированный контент для target_id:{target_id} subgroup_id:{subgroup_id} на {current_date}")
                 return self.content_cache[cache_key]
 
         # Генерируем новый контент
@@ -235,7 +241,7 @@ class ReminderModule(BaseModule):
         if content:
             async with self.cache_lock:
                 self.content_cache[cache_key] = content
-                log.debug(f"Сгенерирован и закеширован контент для группы {group_id} {subgroup_id} на {current_date}")
+                log.debug(f"Сгенерирован и закеширован контент для target_id:{target_id} subgroup_id:{subgroup_id} на {current_date}")
 
         return content
 
@@ -260,27 +266,6 @@ class ReminderModule(BaseModule):
             if keys_to_remove:
                 log.debug(f"Очищен кеш: удалено {len(keys_to_remove)} старых записей")
 
-
-    # ! DEPRECATED
-    # def generate_broadcast_content(self, user: "User", current_date: "datetime.date") -> dict:
-    #     args = dict(
-    #         session=self.session,
-    #         group_id=user.group_id,
-    #         date_start=current_date,
-    #         user_data=dict(
-    #             user_id=user.user_id,
-    #             **user.get_selected_data(),
-    #             user_settings=user.get_user_settings(),
-    #         )
-    #     )
-
-
-    #     schedule: dict = ScheduleModule.get_schedule_by_group_id(**args)
-    #     message = ScheduleModule.get_message_schedule(schedule, is_daily=True, date=current_date)
-
-
-    #     return message
-    # ! END DEPRECATED
 
 
     # *                  Reminder logic

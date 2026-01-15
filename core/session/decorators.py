@@ -20,8 +20,8 @@ def try_repeat_catch(
         @wraps(func)
         def wrapper(*args, **kwargs):
             last_exception = None
-            
-            
+
+
             for attempt in range(1, max_attempts + 1):
                 result = None
                 try:
@@ -32,15 +32,15 @@ def try_repeat_catch(
                     if attempt < max_attempts:
                         time.sleep(delay_seconds)
                         continue
-                    
+
                     if on_failure is not None:
                         on_failure(attempt, e)
 
                     raise Exception(
                         f"Failed after {attempt} attempts. Last error: {str(e)}"
                     ) from e
-            
+
             raise Exception("Unexpected error in try_repeat_catch")
-        
+
         return wrapper
     return decorator

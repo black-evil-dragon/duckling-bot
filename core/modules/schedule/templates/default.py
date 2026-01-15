@@ -37,17 +37,18 @@ class DefaultTemplate(BaseTemplate):
     def format_schedule_day(self, data: dict) -> str:
         # Ininital data
         message = ""
-        group = data.get('group', '')
+        target_name = data.get('group', '') if self.target_type == 'student' else data.get('teacher', '')
         date = data.get('date', '')
         week_day = data.get('week_day', '')
         lessons = data.get('lessons', [])
+
 
         # Prepare
         weekday_name = self.get_weekday_name(week_day)
 
         # Create message
         message += (
-            f"{self.header_component(group, date)}"
+            f"{self.header_component(target_name, date)}"
             "\n\n"
             f"{self.weekday_name_component(weekday_name)}"
             "\n"

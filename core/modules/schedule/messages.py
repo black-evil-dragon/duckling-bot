@@ -8,7 +8,7 @@ from core.modules.schedule.templates.minimal import MinimalTemplate
 from core.modules.schedule.templates.compact import CompactTemplate
 
 from utils.logger import get_logger
-from typing import Literal, overload
+from typing import List, Literal, overload
 
 
 
@@ -59,14 +59,29 @@ def use_paginator(callback_data: str, prev_key: str = None, next_key: str = None
 def get_refresh_button(callback_data: str) -> InlineKeyboardButton:
     return InlineKeyboardButton("🔄 Обновить", callback_data=callback_data)
 
-def get_schedule_button() -> InlineKeyboardButton:
-    return InlineKeyboardButton("📅 Сегодня", callback_data=f"delegate#{CommandNames.SCHEDULE}")
+def get_schedule_button(callback: str = None) -> InlineKeyboardButton:
+    return InlineKeyboardButton("📅 Сегодня", callback_data=callback or f"delegate#{CommandNames.SCHEDULE}")
 
-def get_target_buttons() -> InlineKeyboardButton:
-    return [[
-        InlineKeyboardButton("📚 Группа", callback_data=f"delegate#{CommandNames.QUICK_GROUP_SCHEDULE}"),
-        InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.QUICK_TEACHER_SCHEDULE}")
-    ]]
+def get_target_buttons(additional_buttons: List[InlineKeyboardButton] = None) -> List[List[InlineKeyboardButton]]:
+    return [
+        [
+            InlineKeyboardButton("Установленное", callback_data="ignore")
+        ],
+        [
+            InlineKeyboardButton("📚 Группа", callback_data=f"delegate#{CommandNames.SCHEDULE}?target_type=student"),
+            InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.SCHEDULE}?target_type=teacher")
+        ],
+        [
+            InlineKeyboardButton("Другое (выбор нового)", callback_data="ignore")
+        ],
+        [
+            InlineKeyboardButton("📚 Группа", callback_data=f"delegate#{CommandNames.QUICK_GROUP_SCHEDULE}"),
+            InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.QUICK_TEACHER_SCHEDULE}")
+        ],
+
+        additional_buttons
+
+    ]
 
 
 # * TEXT ___________________________________________________________________

@@ -17,19 +17,21 @@ from core.models.user import User
 
 from core.modules.base import BaseModule
 from core.modules.base.messages import get_commands_text, start_text
-from core.modules.base.decorators import ensure_user_settings
+from core.modules.base.decorators import ensure_user_settings, try_send_message
 
 from core.modules.start import messages
 from core.modules.reminder import messages as reminder_messages
+
 
 from core.settings.commands import CommandNames
 
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 
 if TYPE_CHECKING:
+    from core.modules.teacher.module import TeacherModule
     from core.modules.reminder.module import ReminderModule
     from core.modules.group.module import GroupModule
     from core.modules.schedule.module import ScheduleModule
@@ -72,6 +74,16 @@ class StartModule(BaseModule):
 
         # Получаем номер недели из callback_data
         command = str(query.data.split('#')[-1])
+        params = {}
+
+        if '?' in command:
+            command, params_str = command.split('?')
+
+            for param in params_str.split('&'):
+                name, value = param.split('=')
+                params[name] = value
+
+            context.bot_data['inline_params'] = params
 
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
@@ -86,7 +98,7 @@ class StartModule(BaseModule):
             CommandNames.SHOW_REMINDER: reminderModule.show_reminder_info,
 
             CommandNames.QUICK_GROUP_SCHEDULE: scheduleModule.get_quick_group_schedule,
-            # CommandNames.QUICK_TEACHER_SCHEDULE: scheduleModule.get_quick_teacher_schedule,
+            CommandNames.QUICK_TEACHER_SCHEDULE: scheduleModule.get_quick_teacher_schedule,
         })
 
 
@@ -109,6 +121,36 @@ class StartModule(BaseModule):
             reply_markup=reply_markup
 
         )
+
+
+    # * ____________________________________________________________
+    # * |                        Utils                              |
+    def check_target_id(self, context: ContextTypes.DEFAULT_TYPE) -> Tuple[bool, Callable[[Any, Update, ContextTypes.DEFAULT_TYPE], Any], str]:
+        user_settings: Dict[str, Any] = context.user_data.get('user_settings', {})
+        required_field = 'selected_group'
+
+        groupModule: GroupModule = self.manager.get_module('group')
+
+        callback = groupModule.ask_institute
+
+        if user_settings.get('target_type', 'student') == 'teacher':
+            teacherModule: TeacherModule = self.manager.get_module('teacher')
+            required_field = 'selected_teacher'
+            callback = teacherModule.ask_teacher
+
+        if context.bot_data.get('quick_schedule') is not None:
+            if context.bot_data['quick_schedule'].get('target_id'):
+                return True, None, None
+
+            return False, callback, 'target_id'
+
+        if not context.user_data.get(required_field, False):
+            return False, callback, required_field
+
+        return True, None, required_field
+
+    async def target_exists_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, callback: Callable):
+        await callback(update, context)
 
 
 
@@ -140,6 +182,7 @@ class StartModule(BaseModule):
         scheduleModule: ScheduleModule = self.manager.get_module('schedule')
         groupModule: GroupModule = self.manager.get_module('group')
         reminderModule: ReminderModule = self.manager.get_module('reminder')
+        teacherModule: TeacherModule = self.manager.get_module('teacher')
 
         MENU_COMMANDS = (
             # ROW
@@ -173,6 +216,11 @@ class StartModule(BaseModule):
             (CommandNames.SET_SUBGROUP, "Установить подгруппу", groupModule.ask_subgroup),
 
             # ROW
+            (CommandNames.SET_GROUP, "Установить преподавателя", teacherModule.ask_teacher),
+            (None, None, None),
+            (None, None, None),
+
+            # ROW
             (CommandNames.SETTINGS, "⚙️ Настройки", self.send_settings),
         )
 
@@ -181,6 +229,7 @@ class StartModule(BaseModule):
 
 
     @ensure_user_settings(need_update=True)
+    @try_send_message()
     async def get_menu(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         MENU_COMMANDS = self.get_menu_commands(context)
@@ -190,8 +239,8 @@ class StartModule(BaseModule):
             for i in range(0, len(MENU_COMMANDS), 3)
         ])
 
-        await update_message.reply_text(
-            "📋 Главное меню:",
+        return update_message.edit_text, dict(
+            text="📋 Главное меню:",
             reply_markup=reply_markup
         )
 
@@ -201,6 +250,12 @@ class StartModule(BaseModule):
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         user_settings: dict = context.user_data.get('user_settings', {})
+
+        message_templates = {
+            'default': 'Обычный',
+            'compact': 'Компактный',
+            'minimal': 'Минимальный'
+        }
 
         SETTINGS_COMMANDS = (
             None,
@@ -233,7 +288,7 @@ class StartModule(BaseModule):
 
 
             None,None,
-            ("ignore", "💬 Формат расписания"),
+            ("ignore", f"💬 Формат: {message_templates[user_settings.get('message_template', 'default')]}"),
 
             ("settings#str$default$message_template", f"📚 Обычный {'✅' if user_settings.get('message_template', 'default') == 'default' else '❌'}"),
             ("settings#str$compact$message_template", f"📔 Компакт. {'✅' if user_settings.get('message_template', 'default') == 'compact' else '❌'}"),
@@ -255,6 +310,7 @@ class StartModule(BaseModule):
 
     @classmethod
     @ensure_user_settings(need_update=True)
+    @try_send_message()
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
@@ -268,12 +324,11 @@ class StartModule(BaseModule):
             get_actual_markup=None
         ))
 
-        await update_message.reply_text(
-            messages.settings_text,
+        return update_message.edit_text, dict(
+            text=messages.settings_text,
             parse_mode='HTML',
             reply_markup=reply_markup
         )
-
     # * |___________________________________________________________|
 
 
@@ -304,23 +359,38 @@ class StartModule(BaseModule):
         command = query.data.split('#')[-1]
         value_type, value, setting = command.split('$')
 
+        target_type = user_settings.get('target_type', 'student')
+
 
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
             groupModule: GroupModule = self.manager.get_module('group')
             await groupModule.ask_subgroup(update, context)
 
+        if setting == 'target_type':
+            teacherModule: TeacherModule = self.manager.get_module('teacher')
+
+            if value == 'teacher' and context.user_data.get('selected_teacher') is None:
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text=messages.settings_set_error
+                )
+
+                await teacherModule.ask_teacher(update, context)
+                return
+
         if setting == 'reminder':
             subscriber: "Subscriber" = Subscriber.objects.update_or_create(user_id=user.id)
 
-            if context.user_data.get('selected_group') is None:
+
+            if context.user_data.get('selected_group') is None and target_type == 'student':
                 await context.bot.send_message(
                     chat_id=user.user_id,
                     text=reminder_messages.group_is_not_chosen,
                 )
                 return
 
-            if subscriber.schedule_time is None:
+            if subscriber.schedule_time is None and target_type == 'student':
                 await context.bot.send_message(
                     chat_id=user.user_id,
                     text=reminder_messages.time_is_not_chosen,

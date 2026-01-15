@@ -11,6 +11,7 @@ from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings, try_send_message
 from core.modules.group.module import GroupModule
 
+from core.modules.teacher.module import TeacherModule
 from core.session import Session
 from core.settings.commands import CommandNames
 
@@ -50,6 +51,7 @@ class ScheduleModule(BaseModule):
             CommandHandler(CommandNames.TODAY, self.get_schedule_day),
             CommandHandler(CommandNames.TOMORROW, self.get_schedule_next_day),
             CommandHandler(CommandNames.DATE, self.ask_date),
+
             CommandHandler(CommandNames.QUICK_SCHEDULE, self.ask_target_type),
 
             # Callback
@@ -221,7 +223,10 @@ class ScheduleModule(BaseModule):
 
         # чуть костыльно, но норм
         # Пробрасываем шаблон
-        data.update(dict(message_template=user_data.get('user_settings', {}).get('message_template', "default")))
+        data.update(dict(
+            message_template=user_data.get('user_settings', {}).get('message_template', "default"),
+            target_type=target_type
+        ))
 
         return data
 
@@ -233,6 +238,7 @@ class ScheduleModule(BaseModule):
 
         template_name: Literal['default', 'compact', 'minimal'] = data.get('message_template')
         template = cls.template_manager.get_template(template_name)
+        template.target_type = data.get('target_type')
 
 
         if is_daily and date.weekday() == WeekDay.SUNDAY:
@@ -248,7 +254,7 @@ class ScheduleModule(BaseModule):
             entity = 'День'
             additional_buttons = [
                 messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}'),
-                messages.get_schedule_button()
+                messages.get_schedule_button(f'{callback_data}#{date.today().strftime(strf_time_mask)}')
             ]
 
         else: # then for period
@@ -258,7 +264,7 @@ class ScheduleModule(BaseModule):
                 messages.get_refresh_button(
                     f'{callback_data}#{date.isocalendar().week}.{date.isocalendar().year}'
                 ),
-                messages.get_schedule_button()
+                messages.get_schedule_button(f'{callback_data}#{date.today().strftime(strf_time_mask)}')
             ]
 
 
@@ -276,21 +282,22 @@ class ScheduleModule(BaseModule):
         )
 
 
-    def generate_schedule_content(self, user: User, date: DateType, date_end : DateType = None):
+    def generate_schedule_content(self, user: User, date: DateType, date_end : DateType = None, external_target_id: int = None, external_target_type: Literal['student', 'teacher'] = None):
         user_settings = user.get_user_settings()
 
         schedule_type = 'day'
         is_daily = True
 
-        target_id = user.group_id
-        target_type: Literal['student', 'teacher'] = user_settings.get('target_type', 'student')
+        target_id = external_target_id or user.group_id
+        # * Может отличаться в зависимотси от inline_params в schedule_handler
+        target_type: Literal['student', 'teacher'] = external_target_type or user_settings.get('target_type', 'student')
 
         if date_end is not None:
             schedule_type = 'period'
             is_daily = False
 
         if target_type == 'teacher':
-            target_id = user.teacher_id
+            target_id = external_target_id or user.teacher_id
 
 
         args = dict(
@@ -320,30 +327,48 @@ class ScheduleModule(BaseModule):
     # * |               Command handlers                            |
 
     # * Dialogs
-    @classmethod
-    async def ask_date(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    async def ask_date(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        context.bot_data['quick_schedule'] = None
+
         update_message = update.message or update.callback_query.message
 
         await update_message.reply_text(
             text=messages.schedule_ask_date,
-            reply_markup=cls.generate_calendar()
+            reply_markup=self.generate_calendar()
         )
 
 
-    @classmethod
-    async def ask_target_type(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    @try_send_message()
+    async def ask_target_type(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        context.bot_data['quick_schedule'] = None
+
         update_message = update.message or update.callback_query.message
 
-        await update_message.reply_text(
+        return update_message.edit_text, dict(
             text=messages.schedule_ask_target_type,
-            reply_markup=InlineKeyboardMarkup(messages.get_target_buttons())
+            reply_markup=InlineKeyboardMarkup(messages.get_target_buttons([self.menu_button]))
         )
 
 
     # * Main handlers
     @ensure_user_settings()
     async def schedule_handler(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        context.bot_data['quick_schedule'] = None
+
         schedule_week = context.user_data.get('user_settings', {}).get('show_week', False)
+        inline_params = context.bot_data.get('inline_params')
+        user: User = context.user_data.get('instance')
+        user_settings = user.get_user_settings()
+
+        # * Мини декоратор на переопределение типа запроса
+        if inline_params:
+            target_type = inline_params.get('target_type')
+            if target_type:
+                user_settings['target_type'] = target_type
+
+        # * Сохраняем
+        user.set_user_settings(user_settings)
+
 
         if schedule_week:
             await self.get_schedule_week(update, context)
@@ -360,7 +385,7 @@ class ScheduleModule(BaseModule):
 
 
 
-    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @ensure_user_settings(target_required=True, need_update=True)
     @try_send_message()
     async def get_schedule_day(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
@@ -382,7 +407,7 @@ class ScheduleModule(BaseModule):
 
 
 
-    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @ensure_user_settings(target_required=True, need_update=True)
     @try_send_message()
     async def get_schedule_week(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
@@ -402,12 +427,50 @@ class ScheduleModule(BaseModule):
         except Exception:
             traceback.print_exc()
             await update_message.reply_text(messages.server_error, parse_mode='HTML')
+    # * |___________________________________________________________|
 
 
 
+    # * _____________________________________________________________________________________________
+    # *|                                    QUICK SCHEDULE FEATURE                                   |
+    # * Вообще тут странная хераборина происходит, мне хотелось сделать это в одном месте, но...
+    # * Есть как есть, костыльно
+    # ! КОСТЫЛЬ
     async def get_quick_group_schedule(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        context.user_data['selected_callback'] = ''
-        await self.ask_date(update,context)
+        async def new_ask_date(update: Update, _):
+            update_message = update.message or update.callback_query.message
+
+            await update_message.reply_text(
+                text=messages.schedule_ask_date,
+                reply_markup=self.generate_calendar()
+            )
+
+        context.bot_data['quick_schedule'] = dict(
+            callback=new_ask_date
+        )
+
+        groupModule: GroupModule = self.manager.get_module('group')
+
+        await groupModule.ask_institute(update, context)
+
+
+
+    async def get_quick_teacher_schedule(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        async def new_ask_date(update: Update, _):
+            update_message = update.message or update.callback_query.message
+
+            await update_message.reply_text(
+                text=messages.schedule_ask_date,
+                reply_markup=self.generate_calendar()
+            )
+
+        context.bot_data['quick_schedule'] = dict(
+            callback=new_ask_date
+        )
+
+        teacherModule: TeacherModule = self.manager.get_module('teacher')
+
+        await teacherModule.ask_teacher(update, context)
 
     # * |___________________________________________________________|
 
@@ -416,7 +479,7 @@ class ScheduleModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Callback handlers                           |
-    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @ensure_user_settings(target_required=True)
     async def handle_calendar_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         date_str = await super().handle_calendar_callback(update, context) # Важно для использования календаря
 
@@ -424,7 +487,15 @@ class ScheduleModule(BaseModule):
             date = datetime.strptime(date_str, strf_time_mask)
             user: User = context.user_data.get('instance')
 
-            content = self.generate_schedule_content(user, date)
+            target_id = None
+            target_type = None
+
+            # * Check if quick schedule run
+            if context.bot_data.get('quick_schedule') is not None:
+                target_id = context.bot_data['quick_schedule'].get('target_id')
+                target_type = context.bot_data['quick_schedule'].get('target_type')
+
+            content = self.generate_schedule_content(user, date, external_target_id=target_id, external_target_type=target_type)
 
             await context.bot.send_message(
                 chat_id=user.user_id,
@@ -432,7 +503,7 @@ class ScheduleModule(BaseModule):
             )
 
 
-    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @ensure_user_settings(target_required=True)
     @try_send_message()
     async def schedule_week_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         query = update.callback_query
@@ -453,7 +524,7 @@ class ScheduleModule(BaseModule):
         return query.edit_message_text, content
 
 
-    @ensure_user_settings(target_required_handler=GroupModule.check_target_id)
+    @ensure_user_settings(target_required=True)
     @try_send_message()
     async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         query = update.callback_query
@@ -461,10 +532,19 @@ class ScheduleModule(BaseModule):
         query_date = datetime.strptime(query_data[-1], strf_time_mask)
         user: User = context.user_data.get('instance')
 
+        target_id = None
+        target_type = None
+
         await query.answer()
 
 
-        content = self.generate_schedule_content(user, query_date)
+        # * Check if quick schedule run
+        if context.bot_data.get('quick_schedule') is not None:
+            target_id = context.bot_data['quick_schedule'].get('target_id')
+            target_type = context.bot_data['quick_schedule'].get('target_type')
+
+
+        content = self.generate_schedule_content(user, query_date, external_target_id=target_id, external_target_type=target_type)
 
 
         return query.edit_message_text, content

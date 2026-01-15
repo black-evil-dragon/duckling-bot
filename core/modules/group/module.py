@@ -1,11 +1,10 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from typing import Any, Dict, List
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram import Update
 
 from telegram.ext import CommandHandler, MessageHandler
-from telegram.ext import ContextTypes, Application
+from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
@@ -20,6 +19,12 @@ from core.models import User as UserModel
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
 from slugify import slugify
+from typing import TYPE_CHECKING, Any, Dict, List
+
+
+if TYPE_CHECKING:
+    from core.modules.schedule import ScheduleModule
+
 
 log = get_logger()
 
@@ -64,27 +69,7 @@ class GroupModule(BaseModule):
 
     # * ____________________________________________________________
     # * |                   User utils                             |
-    @staticmethod
-    def clear_choices(context: 'ContextTypes.DEFAULT_TYPE'):
-        for key in ['selected_institute', 'selected_course', 'selected_group']:
-            context.user_data[key] = None
 
-    @classmethod
-    async def check_target_id(cls, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_settings: Dict[str, Any] = context.user_data.get('user_settings', {})
-        required_field = 'selected_group'
-
-        callback = cls.ask_institute
-
-        if user_settings.get('target_type', 'student') == 'teacher':
-            required_field = 'selected_teacher'
-            callback = cls.ask_institute
-
-        if not context.user_data.get(required_field, False):
-            await callback(update, context)
-            return
-
-        return True
 
     # * |___________________________________________________________|
 
@@ -277,7 +262,7 @@ class GroupModule(BaseModule):
         course = context.user_data["selected_course"]
 
         if groups_search is None:
-            groups_search = self.search_group_by_name(user_input) # Group.find_group_by_name(groups=[group for group in groups], group_name=user_input)
+            groups_search = self.search_group_by_name(user_input)
 
         if len(groups_search) == 0:
             await update.message.reply_text(
@@ -306,11 +291,28 @@ class GroupModule(BaseModule):
         course = group.get('course')
         institute = group.get('institute')
 
+        context.user_data["selected_institute"] = institute
+        context.user_data["selected_course"] = course
+
+        # ! КОСТЫЛЬ
+        # Фишки быстрого поиска расписания, вышло не очень, но хоть как-то оно работает...
+        if context.bot_data.get('quick_schedule') is not None:
+            context.bot_data['quick_schedule'].update(dict(
+                target_id=group_id,
+                target_type='student'
+            ))
+
+            await context.bot_data['quick_schedule'].get('callback', lambda update, context: log.error('Не установлен callback для быстрого расписания'))(update, context)
+
+            return dict(stop_dialog=True)
+
 
 
         context.user_data["selected_group"] = group_id
-        context.user_data["selected_institute"] = institute
-        context.user_data["selected_course"] = course
+
+
+
+
 
         user.set_group(group_id)
 

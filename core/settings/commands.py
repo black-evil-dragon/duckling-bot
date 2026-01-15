@@ -15,6 +15,9 @@ class CommandNames(TextChoices):
     SET_GROUP = "group", "Установить группу"
     SET_SUBGROUP = "subgroup", "Установить подгруппу"
 
+    SET_TEACHER = "teacher", "Установить преподавателя"
+
+
     SET_REMINDER = "setreminder", "Установить время рассылки"
     SHOW_REMINDER = "myreminder", "Моя рассылка"
 
@@ -52,7 +55,6 @@ class Command:
         return f"/{self.name}"
 
     def get_description(self):
-
         return self.description or CommandNames.get_label(self.name)
 
 
@@ -64,17 +66,19 @@ COMMANDS_LIST = [
     Command(CommandNames.SCHEDULE, "Расписание (в зависимости от выбора)"),
     Command(CommandNames.MENU),
 
+    Command(CommandNames.QUICK_SCHEDULE),
+
     Command(CommandNames.DATE),
     Command(CommandNames.TODAY),
     Command(CommandNames.TOMORROW),
     Command(CommandNames.WEEK),
 
-    Command(CommandNames.QUICK_SCHEDULE),
-    Command(CommandNames.QUICK_GROUP_SCHEDULE),
-    Command(CommandNames.QUICK_TEACHER_SCHEDULE),
+    # Command(CommandNames.QUICK_GROUP_SCHEDULE),
+    # Command(CommandNames.QUICK_TEACHER_SCHEDULE),
 
     Command(CommandNames.SET_GROUP),
     Command(CommandNames.SET_SUBGROUP),
+    Command(CommandNames.SET_TEACHER),
 
     Command(CommandNames.SET_REMINDER),
     Command(CommandNames.SHOW_REMINDER),

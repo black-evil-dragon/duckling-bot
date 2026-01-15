@@ -1,7 +1,7 @@
 from core.modules.base import strf_time_mask
 
 
-from typing import Dict
+from typing import Dict, Literal
 
 import datetime
 
@@ -10,6 +10,9 @@ import datetime
 # * Base template
 #  Базовый класс с методами для формирования сообщений
 class BaseTemplate:
+
+    target_type: Literal['student', 'teacher'] = 'student'
+
     WEEKDAYS = {
         '1': 'Понедельник', '2': 'Вторник', '3': 'Среда',
         '4': 'Четверг', '5': 'Пятница', '6': 'Суббота', '7': 'Воскресенье'
@@ -20,10 +23,11 @@ class BaseTemplate:
         raise NotImplementedError('Метод get_message должен быть реализован в классе-наследнике')
 
 
+
     # * Компоненты
     def header_component(
         self,
-        group_name: str,
+        target_name: str,
         first_date: str,
         last_date: str = None
     ) -> str:
@@ -38,7 +42,7 @@ class BaseTemplate:
 
 
         return (
-            f"<b>📅 Расписание группы {group_name}</b>\n"
+            f"<b>📅 Расписание: {target_name}</b>\n"
             f"<b>| {'Четная' if week_even else 'Нечетная'} | {date_info} |</b>"
         )
 
@@ -72,6 +76,10 @@ class BaseTemplate:
         location = lesson.get('location', '')
         subgroup = lesson.get('subgroup', ' ') or ' '
 
+        target = f"│ 👨‍🏫 {teacher_degree} {teacher}\n"
+        if self.target_type == 'teacher':
+            target = f"│ 🙋🏼‍♂️ {lesson.get('group')}\n"
+
         # Упрощаем локацию для дистанта
         if 'Дистант' in location:
             location = 'Дистант'
@@ -80,7 +88,7 @@ class BaseTemplate:
             f"┌ 🕒 <b>{time} {subgroup}</b>\n"
             f"│ 📚 {title}\n"
             f"│ 🎯 {lesson_type}\n"
-            f"│ 👨‍🏫 {teacher_degree} {teacher}\n"
+            f"{target}"
             f"└ 📍 {location}"
         )
 

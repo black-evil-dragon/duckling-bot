@@ -50,6 +50,11 @@ class BaseModule:
     async def update_user_settings(*args, **kwargs):
         pass
 
+    @staticmethod
+    def clear_choices(context: 'ContextTypes.DEFAULT_TYPE'):
+        for key in ['selected_institute', 'selected_course', 'selected_group']:
+            context.user_data[key] = None
+
     # * |___________________________________________________________|
 
     # * ____________________________________________________________

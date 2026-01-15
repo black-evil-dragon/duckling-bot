@@ -8,14 +8,24 @@ from core.models.user import User
 from core.modules.base import messages
 
 
-
 from utils.logger import get_logger
 
 from functools import wraps
-from typing import Any, Callable, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
+
 
 from utils.messages import split_message
 import asyncio
+
+
+if TYPE_CHECKING:
+    from core.modules.start import StartModule
+    from core.modules.base import BaseModule
+    # from core.modules.reminder.module import ReminderModule
+    # from core.modules.group.module import GroupModule
+    # from core.modules.schedule.module import ScheduleModule
+
+
 
 log = get_logger()
 
@@ -207,7 +217,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
 
 
 
-def ensure_user_settings(is_await=True, need_update=False, target_required_handler: Callable = None):
+def ensure_user_settings(is_await=True, need_update=False, target_required: bool = False):
     """
 
     Загружает в контекст user_data
@@ -245,10 +255,14 @@ def ensure_user_settings(is_await=True, need_update=False, target_required_handl
             success = True
 
             # * Вообще это костыльно, так как проверять и оповещать можно в async пока что
-            if target_required_handler is not None:
-                success = await target_required_handler(update, context)
+            if target_required:
+                module: BaseModule = args[0]
+                startModule: StartModule = module.manager.get_module('start')
+                success, callback, _ = startModule.check_target_id(context)
 
-                if not success: return
+                if not success and callback is not None:
+                    await startModule.target_exists_callback(update, context, callback)
+                    return
 
             return await func(*args, **kwargs)
 
@@ -256,6 +270,15 @@ def ensure_user_settings(is_await=True, need_update=False, target_required_handl
         def sync_wrapper(*args, **kwargs):
             update, context = get_update_context(args)
             load_user_data(update, context, need_update)
+
+            if target_required:
+                module: BaseModule = args[0]
+                startModule: StartModule = module.manager.get_module('start')
+                success, _, field = startModule.check_target_id(context)
+
+                if not success:
+                    log.error(f"Отсутствует обязательно поле {field}. Выполнение пропущено")
+                    return
 
             return func(*args, **kwargs)
 
@@ -275,6 +298,7 @@ def try_send_message():
 
             MESSAGE_TOO_LONG = ("Message is too long", "Message_too_long")
             MESSAGE_IS_NOT_MODIFIED = ("Message is not modified", "Message_is_not_modified")
+            MESSAGE_CANT_BE_EDITED = ("Message can't be edited")
 
             content: Dict[str, Any]
             callback: Callable
@@ -285,12 +309,16 @@ def try_send_message():
                 await callback(**content)
 
                 return
-                # Test
-                # raise telegram.error.BadRequest("Message is not modified")
 
             except telegram.error.BadRequest as exception:
+                str_exception = str(exception)
                 try:
-                    str_exception = str(exception)
+                    if str_exception in MESSAGE_CANT_BE_EDITED:
+                        await context.bot.send_message(
+                            chat_id=context.user_data.get('user_id'),
+                            **content,
+                        )
+                        return
 
                     if str_exception in MESSAGE_IS_NOT_MODIFIED:
                         await context.bot.send_message(

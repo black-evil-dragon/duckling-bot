@@ -7,6 +7,7 @@ from core.modules.schedule import ScheduleModule
 from core.modules.start.module import StartModule
 
 
+from core.modules.teacher.module import TeacherModule
 from utils.logger import get_logger
 from typing import Dict, List, Optional, Type
 from dataclasses import dataclass, field
@@ -127,6 +128,7 @@ def setup_modules(application: 'Application') -> ModuleManager:
     modules_config = [
         {'module': StartModule, 'name': 'start', 'dependencies': []},
         {'module': GroupModule, 'name': 'group', 'dependencies': []},
+        {'module': TeacherModule, 'name': 'teacher', 'dependencies': []},
         {'module': ScheduleModule, 'name': 'schedule', 'dependencies': []},
         {'module': ReminderModule, 'name': 'reminder', 'dependencies': ['schedule']},
     ]
