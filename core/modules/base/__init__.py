@@ -59,6 +59,8 @@ class BaseModule:
 
     # * ____________________________________________________________
     # * |                        UI                                 |
+    # * | Text
+    menu_back = "⬅️ Назад в меню:"
     # * | Buttons
     menu_button = InlineKeyboardButton("📍 Меню", callback_data="delegate#menu")
 

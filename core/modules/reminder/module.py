@@ -165,6 +165,8 @@ class ReminderModule(BaseModule):
     # *                      Broadcast logic
     # * | broadcast ________________________________________________|
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
+        context.bot_data['quick_schedule'] = None
+
         user_data: dict = context.job.data
 
         user_id = user_data.get('user_id')

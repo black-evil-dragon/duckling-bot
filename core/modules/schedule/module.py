@@ -12,7 +12,6 @@ from core.modules.base.decorators import ensure_user_settings, try_send_message
 from core.modules.group.module import GroupModule
 
 from core.modules.teacher.module import TeacherModule
-from core.session import Session
 from core.settings.commands import CommandNames
 
 

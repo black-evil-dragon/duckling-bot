@@ -1,6 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
+from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram import Update
 
 from telegram.ext import CommandHandler, MessageHandler
@@ -210,6 +210,7 @@ class GroupModule(BaseModule):
             await self.ask_group(update, context, groups_search)
             context.user_data["selected_institute"] = 'Не выбран'
             context.user_data["selected_course"] =  'Не выбран'
+
             return True
 
         elif user_input not in self.group_ids.keys():
@@ -291,8 +292,6 @@ class GroupModule(BaseModule):
         course = group.get('course')
         institute = group.get('institute')
 
-        context.user_data["selected_institute"] = institute
-        context.user_data["selected_course"] = course
 
         # ! КОСТЫЛЬ
         # Фишки быстрого поиска расписания, вышло не очень, но хоть как-то оно работает...
@@ -302,23 +301,32 @@ class GroupModule(BaseModule):
                 target_type='student'
             ))
 
+            await update.message.reply_text(
+                messages.result_choices(institute, course, group_id),
+                reply_markup=ReplyKeyboardRemove()
+            )
+
             await context.bot_data['quick_schedule'].get('callback', lambda update, context: log.error('Не установлен callback для быстрого расписания'))(update, context)
 
             return dict(stop_dialog=True)
+        # ! КОСТЫЛЬ
 
 
 
+        context.user_data["selected_institute"] = institute
+        context.user_data["selected_course"] = course
         context.user_data["selected_group"] = group_id
-
-
-
-
 
         user.set_group(group_id)
 
         await update.message.reply_text(
-            messages.result_choices(institute, course, groups_search[0]),
+            messages.result_choices(institute, course, group.get('group_name')),
             reply_markup=ReplyKeyboardRemove()
+        )
+
+        await update.message.reply_text(
+            text=self.menu_back,
+            reply_markup=InlineKeyboardMarkup([[self.menu_button]])
         )
 
         # Столкнулся с тем, что этод метод должен продолжить работу

@@ -32,6 +32,9 @@ class CommandNames(TextChoices):
     QUICK_GROUP_SCHEDULE = "quickgroup", "Расписание c выбором группы"
     QUICK_TEACHER_SCHEDULE = "quickteacher", "Расписание c выбором преподавателя"
 
+    AUTH = "auth", "Авторизоваться"
+    BROADCAST = "broadcast", "Создать оповещение"
+
 
 class Command:
     name = ""
@@ -85,6 +88,9 @@ COMMANDS_LIST = [
 
     Command(CommandNames.SETTINGS),
     Command(CommandNames.HELP),
+
+    Command(CommandNames.AUTH),
+    Command(CommandNames.BROADCAST),
 ]
 
 

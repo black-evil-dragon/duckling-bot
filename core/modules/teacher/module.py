@@ -2,7 +2,7 @@
 #* Telegram bot framework ________________________________________________________________________
 from typing import Any, Dict, List
 import requests
-from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram import Update
 
 from telegram.ext import CommandHandler, MessageHandler
@@ -157,6 +157,12 @@ class TeacherModule(BaseModule):
                     target_type='teacher'
                 ))
 
+                await update.message.reply_text(
+                    messages.result_choices(teacher),
+                    reply_markup=ReplyKeyboardRemove()
+                )
+
+
                 await context.bot_data['quick_schedule'].get('callback', lambda update, context: log.error('Не установлен callback для быстрого расписания'))(update, context)
 
                 return dict(stop_dialog=True)
@@ -169,6 +175,11 @@ class TeacherModule(BaseModule):
 
             await update.message.reply_text(
                 messages.result_choices(teacher),
+                reply_markup=ReplyKeyboardRemove()
+            )
+
+            await update.message.reply_text(
+                text=self.menu_back,
                 reply_markup=InlineKeyboardMarkup([[self.menu_button]])
             )
 
