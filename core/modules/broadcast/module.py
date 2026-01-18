@@ -1,6 +1,6 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import Update
 
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
@@ -8,22 +8,16 @@ from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
+from core.models.user import UserDataType
 from core.modules.base import BaseModule
-from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, send_on_error, set_dialog_branch, try_send_message
+from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch, try_send_message
 from core.modules.broadcast import messages
 
 from core.settings.commands import CommandNames
-from core.data.group import SUBGROUP_IDS, Group
-from core.models import User as UserModel
+
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-from slugify import slugify
-from typing import TYPE_CHECKING, Any, Dict, List
-
-
-if TYPE_CHECKING:
-    from core.modules.schedule import ScheduleModule
 
 
 log = get_logger()
@@ -33,7 +27,7 @@ log = get_logger()
 class BroadcastModule(BaseModule):
 
     def setup(self):
-        self.application.add_handler(CommandHandler(CommandNames.AUTH, self.ask_admin_type))
+        # self.application.add_handler(CommandHandler(CommandNames.AUTH, self.ask_admin_type))
         self.application.add_handler(CommandHandler(CommandNames.BROADCAST, self.ask_broadcast_message))
 
         self.application.add_handler(CallbackQueryHandler(self.broadcast_auth_callback, pattern="^broadcast_auth#"))
@@ -44,6 +38,9 @@ class BroadcastModule(BaseModule):
 
 
 
+
+    # * ____________________________________________________________
+    # * |               Command handlers                            |
     @ensure_user_settings(need_update=True)
     @try_send_message()
     async def ask_admin_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,7 +50,6 @@ class BroadcastModule(BaseModule):
             text=messages.broadcast_auth_ask_type,
             reply_markup=messages.auth_type_buttons,
         )
-
 
 
 
@@ -68,10 +64,18 @@ class BroadcastModule(BaseModule):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отмена", callback_data="broadcast_cancel")]]),
         )
 
+    # * |___________________________________________________________|
+
+
+
+
+    # * ____________________________________________________________
+    # * |               Message handlers                            |
 
     @ensure_dialog_branch('broadcast_message_selection', stop_after=True)
     async def selection_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = update.message.text
+        user_data: UserDataType = context.user_data
 
         # await update.message.reply_text(
         #     text=user_input,
@@ -79,13 +83,19 @@ class BroadcastModule(BaseModule):
         # )
 
         await context.bot.send_message(
-            chat_id='',
+            chat_id=user_data.get('user_id'),
             text=user_input,
         )
 
         return True
 
+    # * |___________________________________________________________|
 
+
+
+
+    # * ____________________________________________________________
+    # * |               Callback handlers                            |
 
     @ensure_user_settings()
     @try_send_message()
@@ -104,3 +114,8 @@ class BroadcastModule(BaseModule):
             self.menu_back,
             reply_markup=InlineKeyboardMarkup([[self.menu_button]])
         )
+    # * |___________________________________________________________|
+
+
+
+

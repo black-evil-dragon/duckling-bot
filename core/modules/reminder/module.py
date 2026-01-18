@@ -2,13 +2,14 @@
 # * Telegram bot framework ________________________________________________________________________
 from telegram import Update
 
-from telegram.ext import ContextTypes, Application
+from telegram.ext import ContextTypes
 from telegram.ext import CommandHandler, MessageHandler, Job
 from telegram.ext import filters
 
 # * Core ________________________________________________________________________
 from core.models.subscriber import Subscriber
-from core.models.user import User
+from core.models.user import User, UserDataType
+from core.models.user.types import TargetType
 from core.modules.base import BaseModule
 
 
@@ -128,17 +129,17 @@ class ReminderModule(BaseModule):
     @ensure_dialog_branch('reminder_time', stop_after=True)
     async def handle_time_input(self, update: "Update", context: "ContextTypes.DEFAULT_TYPE"):
         user_input = update.message.text.strip()
+        user_data: UserDataType = context.user_data
 
 
         try:
             time = datetime.datetime.strptime(user_input, '%H:%M').time()
         except Exception:
-            # log.debug('Неверный формат времени')
             await update.message.reply_text(messages.wrong_format_time)
             return False
 
 
-        user: User = context.user_data.get('user_model')
+        user: User = user_data.get('instance')
         user_settings = user.get_user_settings()
 
         subscriber: "Subscriber" = Subscriber.objects.update_or_create(
@@ -167,7 +168,7 @@ class ReminderModule(BaseModule):
     async def schedule_broadcast(self, context: "ContextTypes.DEFAULT_TYPE"):
         context.bot_data['quick_schedule'] = None
 
-        user_data: dict = context.job.data
+        user_data: UserDataType = context.job.data
 
         user_id = user_data.get('user_id')
         user: "User" = User.objects.get(user_id=user_id)
@@ -175,7 +176,7 @@ class ReminderModule(BaseModule):
         if not user:
             log.warning(f'Пользователь {user_id} не найден')
 
-        user_settings: dict = user.get_user_settings()
+        user_settings = user.get_user_settings()
         current_date = datetime.datetime.now().date()
 
 
@@ -187,7 +188,7 @@ class ReminderModule(BaseModule):
             return
 
 
-        if not user_settings.get('reminder_today', True):
+        if not user_settings.get('reminder_today'):
             current_date += datetime.timedelta(days=1)
 
         content: dict = await self.get_cached_content(user, current_date)
@@ -216,16 +217,18 @@ class ReminderModule(BaseModule):
 
 
     # Получение щакешированного контента
-    async def get_cached_content(self, user: "User", current_date: "datetime.date") -> dict:
+    async def get_cached_content(self, user: User, current_date: datetime.date) -> dict:
         target_id = user.group_id
-        target_type = "student"
+        target_type: TargetType = "student"
         subgroup_id = user.subgroup_id
 
-        if user.get_user_settings().get('target_type', 'student') == 'teacher':
+        if user.get_user_settings().get('target_type') == 'teacher':
             target_type = 'teacher'
             target_id = user.teacher_id
 
         cache_key = (current_date, f"{target_type}_{target_id}", subgroup_id)
+
+
 
         await self.cleanup_old_cache()
 
@@ -274,7 +277,7 @@ class ReminderModule(BaseModule):
     # * | sign_subscriber __________________________________________|
     # ? | Подписываем пользователя на интервальное событие
     # ? | или отписываем
-    async def sign_subscriber(self, subscriber: "Subscriber", is_sign: bool, user: "User" = None):
+    async def sign_subscriber(self, subscriber: Subscriber, is_sign: bool, user: User = None):
         reminder_time = subscriber.schedule_time
 
         log.debug(f'Подписываем пользователя {subscriber.user_id} на подписку {is_sign}')
@@ -294,10 +297,10 @@ class ReminderModule(BaseModule):
     # * | Set reminder _____________________________________________|
     # ? | Ставим джобу
     async def set_reminder_for_user(self, subscriber: "Subscriber", reminder_time: "datetime.time", user: "User" = None):
-        user: "User" = subscriber.get_user() if user is None else user
+        user: User = subscriber.get_user() if user is None else user
 
         user_id = user.id
-        user_data: dict = user.get_user_data()
+        user_data = user.get_user_data()
 
         # Останавливаем предыдущее напоминание, если есть
         await self.stop_reminder_for_user(subscriber)
@@ -325,7 +328,7 @@ class ReminderModule(BaseModule):
 
     # * | Stop reminder _____________________________________________|
     # ? | Останавливаем джобу
-    async def stop_reminder_for_user(self, subscriber: "Subscriber"):
+    async def stop_reminder_for_user(self, subscriber: Subscriber):
         user_id = subscriber.user_id
 
         jobs = self.application.job_queue.get_jobs_by_name(self.get_job_name(user_id))

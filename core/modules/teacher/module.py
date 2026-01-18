@@ -1,7 +1,5 @@
 
 #* Telegram bot framework ________________________________________________________________________
-from typing import Any, Dict, List
-import requests
 from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram import Update
 
@@ -10,7 +8,7 @@ from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
-from core.models.user import User
+from core.models import User
 from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch
 from core.modules.teacher import messages
@@ -20,6 +18,10 @@ from core.settings.commands import CommandNames
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
 from slugify import slugify
+from typing import Any, Dict, List
+
+import requests
+
 
 log = get_logger()
 

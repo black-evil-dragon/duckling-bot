@@ -1,8 +1,12 @@
+
+#* Core ________________________________________________________________________
 from sqlalchemy import Boolean, Column, Engine, Inspector, Integer, String, JSON, inspect, text
-
 from db.core import models
+from core.models.user.types import DEFAULT_USER_SETTINGS, UserDataType, UserSelectedDataType, UserSettingsType
 
 
+
+#* Utils ________________________________________________________________________
 from utils.logger import get_logger
 from typing import Any, Literal
 
@@ -27,14 +31,7 @@ class User(models.BaseModel):
     group_id = Column(Integer, default=None)
     subgroup_id = Column(Integer, default=None)
 
-    user_settings = Column(JSON, default={})
-
-
-    DEFAULT_USER_SETTINGS = dict(
-        reminder=False,
-        message_template="default",
-        subgroup_lock=True,
-    )
+    user_settings = Column(JSON, default=DEFAULT_USER_SETTINGS)
 
 
     def __str__(self):
@@ -88,8 +85,8 @@ class User(models.BaseModel):
 
 
     # * SERIALIZE DATA
-    def get_user_data(self):
-        user_data = dict(
+    def get_user_data(self) -> UserDataType:
+        user_data: UserDataType = dict(
             user_id=self.user_id,
             first_name=self.first_name,
             last_name=self.last_name,
@@ -105,7 +102,7 @@ class User(models.BaseModel):
 
         return user_data
 
-    def get_selected_data(self):
+    def get_selected_data(self) -> UserSelectedDataType:
         return dict(
             selected_teacher=self.teacher_id,
             selected_group=self.group_id,
@@ -134,23 +131,25 @@ class User(models.BaseModel):
                 subgroup_lock=set_subgroup_lock
             ))
             self.set_user_settings(settings)
-            return # Сохранение происходит в set_user_settings
+            # * Сохранение происходит в set_user_settings
+            # - self.save()
+            return
 
         self.save()
 
 
     # * SETTINGS MANAGEMENT
-    def get_user_settings(self):
+    def get_user_settings(self) -> UserSettingsType:
         try:
             if not self.user_settings:
-                return dict()
+                return DEFAULT_USER_SETTINGS
 
             return self.user_settings
         except Exception:
             log.exception('Не удалось получить настройки пользователя')
             return {}
 
-    def set_user_settings(self, user_settings: dict):
+    def set_user_settings(self, user_settings: UserSettingsType | dict):
         self.user_settings = user_settings
         self.save()
 

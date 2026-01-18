@@ -6,7 +6,7 @@ from telegram.ext import CommandHandler, CallbackQueryHandler, ContextTypes
 
 #* Core ________________________________________________________________________
 from core.data.weekdays import WeekDay
-from core.models.user import User
+from core.models import User
 from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings, try_send_message
 from core.modules.group.module import GroupModule
@@ -263,7 +263,7 @@ class ScheduleModule(BaseModule):
                 messages.get_refresh_button(
                     f'{callback_data}#{date.isocalendar().week}.{date.isocalendar().year}'
                 ),
-                messages.get_schedule_button(f'{callback_data}#{date.today().strftime(strf_time_mask)}')
+                messages.get_schedule_button(f'{callback_data}#{date.today().isocalendar().week}.{date.today().year}')
             ]
 
 
@@ -326,6 +326,7 @@ class ScheduleModule(BaseModule):
     # * |               Command handlers                            |
 
     # * Dialogs
+    @ensure_user_settings(target_required=True)
     async def ask_date(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         context.bot_data['quick_schedule'] = None
 

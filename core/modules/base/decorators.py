@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 import telegram
 
 
-from core.models.user import User
+from core.models import User
 from core.modules.base import messages
 
 
@@ -17,13 +17,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Literal, Tuple
 
 import asyncio
 
-
 if TYPE_CHECKING:
     from core.modules.start import StartModule
     from core.modules.base import BaseModule
-    # from core.modules.reminder.module import ReminderModule
-    # from core.modules.group.module import GroupModule
-    # from core.modules.schedule.module import ScheduleModule
 
 
 
@@ -185,7 +181,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
                     stop_dialog=True
                 )
 
-                if result is not None:
+                if result is not None and result is not False:
                     if isinstance(result, dict):
                         data.update(**result)
 
@@ -196,7 +192,7 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
 
                     return result
 
-                if result is None:
+                if result is None or result is False:
                     manager.increment_context_attempt()
 
                     if manager.current_attempt() > max_attempts:
@@ -304,7 +300,7 @@ def ensure_user_settings(is_await=True, need_update=False, target_required=False
 
             user: User = context.user_data.get('instance')
 
-            if not check_access(user.role):
+            if not check_access(user):
                 log.error(f"У пользователя {user.user_id}[{user.role}] нет доступа к {role_access}")
                 return
 
@@ -409,24 +405,3 @@ def try_send_message():
 
         return wrapper
     return decorator
-
-
-# ! DEPRECATED
-def command_process(is_run: bool = True, stop_after: bool = False):
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        async def wrapper(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE', **kwargs):
-            log.warning(f'Deprecated: {func.__name__}. Не оптимизировано!')
-            context.user_data['is_command_process'] = is_run
-
-            result = await func(update, context, **kwargs)
-
-            if stop_after:
-                context.user_data['is_command_process'] = False
-
-
-            return result
-
-        return wrapper
-    return decorator
-# !END DEPRECATED

@@ -12,9 +12,9 @@ from telegram.error import BadRequest
 
 
 #* Core ________________________________________________________________________
-from core.models.subscriber import Subscriber
-from core.models.user import User
+from core.models import Subscriber, User
 
+from core.models.user.types import UserDataType, UserSettingsType
 from core.modules.base import BaseModule
 from core.modules.base.messages import get_commands_text, start_text
 from core.modules.base.decorators import ensure_user_settings, try_send_message
@@ -28,7 +28,7 @@ from core.settings.commands import CommandNames
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple, Union
 
 if TYPE_CHECKING:
     from core.modules.teacher.module import TeacherModule
@@ -176,8 +176,9 @@ class StartModule(BaseModule):
 
 
 
-    def get_menu_commands(self, context: 'ContextTypes.DEFAULT_TYPE'):
-        user_settings: dict = context.user_data.get('user_settings', {})
+    def get_menu_commands(self, context: ContextTypes.DEFAULT_TYPE):
+        user_data: UserDataType = context.user_data
+        user_settings = user_data.get('user_settings')
 
         scheduleModule: ScheduleModule = self.manager.get_module('schedule')
         groupModule: GroupModule = self.manager.get_module('group')
@@ -192,7 +193,7 @@ class StartModule(BaseModule):
 
             # ROW
             (CommandNames.SCHEDULE, "Расписание", scheduleModule.schedule_handler),
-            (CommandNames.TODAY, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", scheduleModule.get_schedule_week),
+            (CommandNames.TODAY, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week') else ("week", "На неделю", scheduleModule.get_schedule_week),
             (CommandNames.TOMORROW, "На завтра", scheduleModule.get_schedule_next_day),
 
             # ROW
@@ -249,7 +250,8 @@ class StartModule(BaseModule):
     @classmethod
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        user_settings: dict = context.user_data.get('user_settings', {})
+        user_data: UserDataType = context.user_data
+        user_settings: UserSettingsType = user_data.get('user_settings', {})
 
         message_templates = {
             'default': 'Обычный',
@@ -260,28 +262,28 @@ class StartModule(BaseModule):
         SETTINGS_COMMANDS = (
             None,
             (
-                f"settings#bool${not user_settings.get('subgroup_lock', False)}$subgroup_lock",
-                f"Только подгруппа {'✅' if user_settings.get('subgroup_lock', False) else '❌'}",
+                f"settings#bool${not user_settings.get('subgroup_lock')}$subgroup_lock",
+                f"Только подгруппа {'✅' if user_settings.get('subgroup_lock') else '❌'}",
             ),
             None,
 
 
             # Связанные настройки, если включен один, другой выключить
             (
-                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
-                f"П.у неделя {'✅' if user_settings.get('show_week', False) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week')}$show_week",
+                f"П.у неделя {'✅' if user_settings.get('show_week') else '❌'}",
             ),
             None,
             (
-                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
-                f"П.у день {'✅' if not user_settings.get('show_week', False) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week')}$show_week",
+                f"П.у день {'✅' if not user_settings.get('show_week') else '❌'}",
             ),
 
 
             None,None,
             (
-                f"settings#bool${not user_settings.get('reminder', False)}$reminder",
-                f"📢 Рассылка {'✅' if user_settings.get('reminder', False) else '❌'}",
+                f"settings#bool${not user_settings.get('reminder')}$reminder",
+                f"📢 Рассылка {'✅' if user_settings.get('reminder') else '❌'}",
             ),
 
 
