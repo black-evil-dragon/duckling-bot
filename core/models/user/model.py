@@ -25,7 +25,7 @@ class User(models.BaseModel):
     last_name = Column(String, default="")
     username = Column(String, default="")
 
-    role: Literal['user', 'admin', 'teacher'] = Column(String, default="user")
+    role: Literal['user', 'admin', 'teacher'] = Column(String, default="user") #* MIGRATION!
 
     teacher_id = Column(Integer, default=None) #* MIGRATION!
     group_id = Column(Integer, default=None)

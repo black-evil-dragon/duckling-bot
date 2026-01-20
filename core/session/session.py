@@ -50,27 +50,6 @@ class Session:
 
             self.get_all_groups()
 
-            # # * Tests
-            # print(self.session.post('http://127.0.0.1:8000/api/schedule/period/', json=dict(
-            #     target_type='teacher',
-            #     teacher_id=299,
-            #     date_start='2026-01-05',
-            #     date_end="2026-01-10"
-            # )).json())
-            # exit()
-            # # print()
-
-            # print(self.session.post('http://127.0.0.1:8000/api/schedule/day/', json=dict(
-            #     group_id=233,
-            #     date='2025-09-08'
-            # )).json())
-            # print()
-            # print(self.session.post('http://127.0.0.1:8000/api/schedule/weeks/', json=dict(
-            #     group_id=233,
-            #     date_start='2026-01-10',
-            #     date_end="2026-01-17"
-            # )).json())
-            # exit()
 
         except Exception as error:
             log.critical(f"! Критическая ошибка при инициализации сессии: {str(error)}")
@@ -84,7 +63,7 @@ class Session:
     # * ____________________________________________________________
     # * |                       Update data
     def get_all_groups(self):
-        path = 'group/get-tree/'
+        path = 'group/tree/'
 
         response: 'requests.Response' = self.post(path)
 
@@ -113,6 +92,33 @@ class Session:
 
     # * ____________________________________________________________
     # * |                 Http methods
+    def fetch(
+        self,
+        path: str,
+        params: dict = None,
+    ) -> dict:
+        if params is None:
+            params = {}
+
+        response: requests.Response = self.session.post(
+            path,
+            json=params
+        )
+
+        try:
+            response.raise_for_status()
+        except Exception as error:
+            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response.content.decode("unicode_escape")}. Данные запроса: {params}')
+            return
+
+        response_json: dict = response.json()
+
+        log.debug(f'Получен ответ: {response_json}')
+
+        return response_json
+
+
+
     @try_repeat_catch(
         max_attempts=2,
         delay_seconds=2.0,

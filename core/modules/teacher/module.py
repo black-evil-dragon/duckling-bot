@@ -13,14 +13,17 @@ from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch
 from core.modules.teacher import messages
 
+
 from core.settings.commands import CommandNames
 
 #* Other packages ________________________________________________________________________
+from core.session import Session
 from utils.logger import get_logger
 from slugify import slugify
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import requests
+
 
 
 log = get_logger()
@@ -28,12 +31,12 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class TeacherModule(BaseModule):
-    session: requests.Session = None
+    # session: Session = None
 
     teachers = {}
 
     def setup(self):
-        self.session = self.application.bot_data.get('session')
+        self.session: Session = self.application.bot_data.get('session')
 
 
         self.application.add_handler(
@@ -48,7 +51,7 @@ class TeacherModule(BaseModule):
 
 
     def set_teachers(self):
-        teachers: List[Dict[str, str]] = self.fetch('teacher/all/').get('teachers')
+        teachers: List[Dict[str, str]] = self.fetch('teacher/all/').get('data')
 
         for teacher in teachers:
             slug = slugify(teacher.get('name'))
@@ -69,7 +72,7 @@ class TeacherModule(BaseModule):
         if params is None:
             params = {}
 
-        response = self.session.post(
+        response: requests.Response = self.session.post(
             path,
             json=params
         )
@@ -85,10 +88,6 @@ class TeacherModule(BaseModule):
 
         # log.debug(f'Получен ответ: {response_json}')
         return response_json
-
-
-    def search_teacher(self, teacher_name):
-        pass
 
     # * |___________________________________________________________|
 

@@ -65,7 +65,7 @@ class StartModule(BaseModule):
         self.application.add_handler(CallbackQueryHandler(self.handle_inline_commands, pattern="^delegate#"))
 
 
-
+    @ensure_user_settings()
     async def handle_inline_commands(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         MENU_COMMANDS = self.get_menu_commands(context)
 
@@ -99,6 +99,7 @@ class StartModule(BaseModule):
 
             CommandNames.QUICK_GROUP_SCHEDULE: scheduleModule.get_quick_group_schedule,
             CommandNames.QUICK_TEACHER_SCHEDULE: scheduleModule.get_quick_teacher_schedule,
+            CommandNames.QUICK_LOCATION_SCHEDULE: scheduleModule.get_quick_location_schedule,
         })
 
 
@@ -234,6 +235,7 @@ class StartModule(BaseModule):
     async def get_menu(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         MENU_COMMANDS = self.get_menu_commands(context)
+
 
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd]

@@ -9,9 +9,9 @@ from core.data.weekdays import WeekDay
 from core.models import User
 from core.modules.base import BaseModule, strf_time_mask
 from core.modules.base.decorators import ensure_user_settings, try_send_message
-from core.modules.group.module import GroupModule
 
-from core.modules.teacher.module import TeacherModule
+
+
 from core.settings.commands import CommandNames
 
 
@@ -21,12 +21,17 @@ from . import messages
 #* Other packages ________________________________________________________________________
 from datetime import datetime, timedelta
 from datetime import date as DateType
-from typing import Any, Dict, Literal, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Literal, Tuple
 from utils.logger import get_logger
 
 import traceback
 import requests
 
+
+if TYPE_CHECKING:
+    from core.modules.location import LocationModule
+    from core.modules.teacher import TeacherModule
+    from core.modules.group.module import GroupModule
 
 log = get_logger()
 
@@ -471,6 +476,24 @@ class ScheduleModule(BaseModule):
         teacherModule: TeacherModule = self.manager.get_module('teacher')
 
         await teacherModule.ask_teacher(update, context)
+
+
+    async def get_quick_location_schedule(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+        async def new_ask_date(update: Update, _):
+            update_message = update.message or update.callback_query.message
+
+            await update_message.reply_text(
+                text=messages.schedule_ask_date,
+                reply_markup=self.generate_calendar()
+            )
+
+        context.bot_data['quick_schedule'] = dict(
+            callback=new_ask_date
+        )
+
+        locationModule: LocationModule = self.manager.get_module('location')
+
+        await locationModule.ask_building(update, context)
 
     # * |___________________________________________________________|
 

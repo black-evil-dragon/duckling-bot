@@ -19,11 +19,7 @@ from core.models import User as UserModel
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
 from slugify import slugify
-from typing import TYPE_CHECKING, Any, Dict, List
-
-
-if TYPE_CHECKING:
-    from core.modules.schedule import ScheduleModule
+from typing import Any, Dict, List
 
 
 log = get_logger()

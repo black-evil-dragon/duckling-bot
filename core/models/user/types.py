@@ -12,6 +12,7 @@ __all__ = [
 
 MessageTemplateType = Literal["default", "compact", "minimal"]
 TargetType = Literal["student", "teacher"]
+RoleType = Literal['user', 'admin', 'teacher']
 
 
 class UserSettingsType(TypedDict):
@@ -77,7 +78,7 @@ class UserDataType(UserSelectedDataType):
     first_name: str
     last_name: str
     username: str
-    role: str
+    role: RoleType
 
     user_settings: UserSettingsType
 

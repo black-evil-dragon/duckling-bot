@@ -76,8 +76,9 @@ def get_target_buttons(additional_buttons: List[InlineKeyboardButton] = None) ->
         ],
         [
             InlineKeyboardButton("📚 Группа", callback_data=f"delegate#{CommandNames.QUICK_GROUP_SCHEDULE}"),
-            InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.QUICK_TEACHER_SCHEDULE}")
+            InlineKeyboardButton("💼 Преподаватель", callback_data=f"delegate#{CommandNames.QUICK_TEACHER_SCHEDULE}"),
         ],
+        [InlineKeyboardButton("🏫 Кабинет", callback_data=f"delegate#{CommandNames.QUICK_LOCATION_SCHEDULE}")],
 
         additional_buttons
 

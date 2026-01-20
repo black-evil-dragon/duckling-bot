@@ -31,6 +31,7 @@ class CommandNames(TextChoices):
     QUICK_SCHEDULE = "quick", "Расписание с выбором группы или преподавателя"
     QUICK_GROUP_SCHEDULE = "quickgroup", "Расписание c выбором группы"
     QUICK_TEACHER_SCHEDULE = "quickteacher", "Расписание c выбором преподавателя"
+    QUICK_LOCATION_SCHEDULE = "quicklocation", "Расписание c выбором преподавателя"
 
     AUTH = "auth", "Авторизоваться"
     BROADCAST = "broadcast", "Создать оповещение"

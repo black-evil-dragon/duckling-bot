@@ -1,11 +1,13 @@
 from telegram.ext import Application
 
 from core.modules.base import BaseModule
+
 from core.modules.broadcast import BroadcastModule
 from core.modules.group import GroupModule
-from core.modules.reminder.module import ReminderModule
+from core.modules.location import LocationModule
+from core.modules.reminder import ReminderModule
 from core.modules.schedule import ScheduleModule
-from core.modules.start.module import StartModule
+from core.modules.start import StartModule
 
 
 from core.modules.teacher.module import TeacherModule
@@ -131,6 +133,7 @@ def setup_modules(application: 'Application') -> ModuleManager:
         {'module': BroadcastModule, 'name': 'broadcast', 'dependencies': []},
         {'module': GroupModule, 'name': 'group', 'dependencies': []},
         {'module': TeacherModule, 'name': 'teacher', 'dependencies': []},
+        {'module': LocationModule, 'name': 'location', 'dependencies': []},
         {'module': ScheduleModule, 'name': 'schedule', 'dependencies': []},
         {'module': ReminderModule, 'name': 'reminder', 'dependencies': ['schedule']},
     ]
