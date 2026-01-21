@@ -79,6 +79,9 @@ class BaseTemplate:
         target = f"│ 👨‍🏫 {teacher_degree} {teacher}\n"
         if self.target_type == 'teacher':
             target = f"│ 🙋🏼‍♂️ {lesson.get('group')}\n"
+        elif self.target_type == 'location':
+            target = f"│ 👨‍🏫 {teacher}\n│ 🙋🏼‍♂️ {lesson.get('group')}\n"
+
 
         # Упрощаем локацию для дистанта
         if 'Дистант' in location:

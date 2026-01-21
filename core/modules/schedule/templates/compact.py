@@ -21,6 +21,8 @@ class CompactTemplate(DefaultTemplate):
         target = f"└ 👨‍🏫 {teacher}"
         if self.target_type == 'teacher':
             target = f"└ 🙋🏼‍♂️ {lesson.get('group')}"
+        elif self.target_type == 'location':
+            target = f"│ 👨‍🏫 {teacher}\n└ 🙋🏼‍♂️ {lesson.get('group')}"
 
         return (
             f"┌ 🕒 <b>{time} | {location}</b>\n"

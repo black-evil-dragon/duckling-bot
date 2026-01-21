@@ -100,7 +100,7 @@ class Session:
         if params is None:
             params = {}
 
-        response: requests.Response = self.session.post(
+        response: requests.Response = self.post(
             path,
             json=params
         )
@@ -113,7 +113,7 @@ class Session:
 
         response_json: dict = response.json()
 
-        log.debug(f'Получен ответ: {response_json}')
+        # log.debug(f'Получен ответ: {str(response_json)[:100]}...')
 
         return response_json
 

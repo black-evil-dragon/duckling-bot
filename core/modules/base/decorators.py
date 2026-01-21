@@ -175,7 +175,9 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
             manager.set_context_from_args(args)
 
             # * Проверяем, активен ли диалог
-            if manager.is_dialog_process(dialog_name):
+            is_dialog_process = manager.is_dialog_process(dialog_name)
+            # log.debug(f'func "{func}" try to enter in "{dialog_name}" branch - {is_dialog_process}')
+            if is_dialog_process:
                 result = await func(*args, **kwargs)
                 data = dict(
                     stop_dialog=True
@@ -189,6 +191,10 @@ def ensure_dialog_branch(dialog_name: str, stop_after: bool = False, max_attempt
                         manager.set_dialog_process(False, dialog_name)
 
                     manager.reset_context_attempt()
+
+                    if data.get('callback'):
+                        update, context = manager.get_update(), manager.get_context()
+                        await data.get('callback')(update, context)
 
                     return result
 

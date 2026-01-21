@@ -22,6 +22,12 @@ class MinimalTemplate(DefaultTemplate):
         if subgroup:
             time += f" | {subgroup}"
 
+        if self.target_type == 'teacher':
+            location = lesson.get('group')
+
+        elif self.target_type == 'location':
+            location = lesson.get('teacher')
+
         return (
             f"┌ 🕒 <b>{time} | {location}</b>\n"
             f"└ 🎯 [{lesson_type}] {title}"

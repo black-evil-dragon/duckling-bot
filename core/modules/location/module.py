@@ -40,18 +40,14 @@ class LocationModule(BaseModule):
     def setup(self):
         self.session = self.application.bot_data.get("session")
 
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_building), group=6)
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_audience), group=5)
 
-        self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_building),
-            group=3,
-        )
-        self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_audience),
-            group=3,
-        )
 
-    @set_dialog_branch("building_selection")
+    @ensure_user_settings()
+    @set_dialog_branch("building_selection", reset_attempt=True)
     async def ask_building(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        log.debug(context.user_data)
         context.user_data["selected_building"] = None
 
         update_message = update.message or update.callback_query.message
@@ -65,60 +61,61 @@ class LocationModule(BaseModule):
             ),
         )
 
-    @set_dialog_branch("audience_selection")
+
+    @set_dialog_branch("audience_selection", reset_attempt=True)
     async def ask_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        log.debug(context.user_data)
         update_message = update.message or update.callback_query.message
 
         await update_message.reply_text(
-            text=messages.choose_audience, reply_markup=ReplyKeyboardRemove()
+            text=messages.choose_audience,
+            reply_markup=ReplyKeyboardRemove()
         )
 
-    @ensure_user_settings()
-    @ensure_dialog_branch("building_selection")
+
+    @ensure_dialog_branch("building_selection", stop_after=True)
     async def selection_building(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        update_message = update.message or update.callback_query.message
-        user_input = update_message.text
+        log.debug(context.user_data)
+        user_input = update.message.text
 
         locations = self.session.fetch(
             "location/search/", dict(building=user_input)
         ).get("data")
 
         if not locations:
-            await update_message.reply_text(
+            await update.message.reply_text(
                 messages.empty_buildings,
             )
             return
 
         context.user_data["selected_building"] = user_input
-        await self.ask_audience(update, context)
 
-        return dict(stop_dialog=True)
+        return dict(
+            callback=self.ask_audience
+        )
 
-    @ensure_user_settings()
-    @ensure_dialog_branch("audience_selection")
-    async def selection_audience(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        update_message = update.message or update.callback_query.message
-        user_input = update_message.text
+
+    @ensure_dialog_branch("audience_selection", stop_after=True)
+    async def selection_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        log.debug(context.user_data)
+        user_input = update.message.text
 
         locations = self.session.fetch(
             "location/search/",
             dict(building=context.user_data["selected_building"], audience=user_input),
         ).get("data")
 
+
         if not locations:
-            await update_message.reply_text(
-                messages.empty_audiences,
-            )
+            await update.message.reply_text(messages.empty_audiences)
             return
 
         elif len(locations) > 1:
-            await update_message.reply_text(
+            await update.message.reply_text(
                 messages.choose_audience,
                 reply_markup=messages.get_locations_reply_markup(locations),
             )
-            return True
+            return dict(stop_dialog=False)
 
 
         # ! КОСТЫЛЬ

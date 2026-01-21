@@ -21,7 +21,7 @@ def result_choices(location: Dict[str, str]):
 def get_locations_reply_markup(locations):
     return ReplyKeyboardMarkup([
         [
-            KeyboardButton(teacher.get('address'))
+            KeyboardButton(teacher.get('audience'))
             for teacher in locations[i:i+2]
         ] for i in range(0, len(locations[:150]), 2)
     ], one_time_keyboard=True, resize_keyboard=True)

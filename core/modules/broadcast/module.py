@@ -34,7 +34,7 @@ class BroadcastModule(BaseModule):
         self.application.add_handler(CallbackQueryHandler(self.cancel_callback, pattern="^broadcast_cancel"))
 
 
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_message))
+        # self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_message))
 
 
 

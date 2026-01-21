@@ -51,7 +51,7 @@ class TeacherModule(BaseModule):
 
 
     def set_teachers(self):
-        teachers: List[Dict[str, str]] = self.fetch('teacher/all/').get('data')
+        teachers: List[Dict[str, str]] = self.session.fetch('teacher/all/').get('data')
 
         for teacher in teachers:
             slug = slugify(teacher.get('name'))
@@ -64,30 +64,6 @@ class TeacherModule(BaseModule):
     # * ____________________________________________________________
     # * |               Utils                                       |
 
-    def fetch(
-        self,
-        path: str,
-        params: dict = None,
-    ) -> dict:
-        if params is None:
-            params = {}
-
-        response: requests.Response = self.session.post(
-            path,
-            json=params
-        )
-
-        try:
-            response.raise_for_status()
-        except Exception as error:
-            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response.content.decode("unicode_escape")}. Данные запроса: {params}')
-            return
-
-        response_json: dict = response.json()
-
-
-        # log.debug(f'Получен ответ: {response_json}')
-        return response_json
 
     # * |___________________________________________________________|
 
@@ -127,7 +103,7 @@ class TeacherModule(BaseModule):
         user_input = update_message.text
         user: User = context.user_data.get("user_model")
 
-        teachers: List[Dict[str, Any]] = self.fetch('teacher/search/', dict(
+        teachers: List[Dict[str, Any]] = self.session.fetch('teacher/search/', dict(
             teacher_name=user_input
         )).get('data')
 
