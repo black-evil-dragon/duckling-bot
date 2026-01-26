@@ -1,13 +1,11 @@
 # * Telegram bot framework ________________________________________________________________________
 from telegram import (
-    InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
-    KeyboardButton,
     ReplyKeyboardRemove,
 )
 from telegram import Update
 
-from telegram.ext import CommandHandler, MessageHandler
+from telegram.ext import MessageHandler
 from telegram.ext import ContextTypes
 from telegram.ext import filters
 
@@ -20,15 +18,13 @@ from core.modules.base.decorators import (
 )
 from core.modules.location import messages
 
-from core.settings.commands import CommandNames
-
 # * Other packages ________________________________________________________________________
 from utils.logger import get_logger
-from slugify import slugify
-from typing import TYPE_CHECKING, Any, Dict, List
 from core.session import Session
 
 log = get_logger()
+
+
 
 
 # * Module ________________________________________________________________________
@@ -40,14 +36,22 @@ class LocationModule(BaseModule):
     def setup(self):
         self.session = self.application.bot_data.get("session")
 
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_building), group=6)
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_audience), group=5)
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_building),
+            group=6,
+        )
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_audience),
+            group=5,
+        )
 
 
+
+    # * ____________________________________________________________
+    # * |               Command handlers                            |
     @ensure_user_settings()
     @set_dialog_branch("building_selection", reset_attempt=True)
     async def ask_building(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        log.debug(context.user_data)
         context.user_data["selected_building"] = None
 
         update_message = update.message or update.callback_query.message
@@ -62,19 +66,27 @@ class LocationModule(BaseModule):
         )
 
 
+
     @set_dialog_branch("audience_selection", reset_attempt=True)
     async def ask_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.debug(context.user_data)
         update_message = update.message or update.callback_query.message
 
         await update_message.reply_text(
-            text=messages.choose_audience,
-            reply_markup=ReplyKeyboardRemove()
+            text=messages.choose_audience, reply_markup=ReplyKeyboardRemove()
         )
+    # * |___________________________________________________________|
 
 
+
+
+
+    # * ____________________________________________________________
+    # * |               Message handlers                            |
     @ensure_dialog_branch("building_selection", stop_after=True)
-    async def selection_building(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def selection_building(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         log.debug(context.user_data)
         user_input = update.message.text
 
@@ -90,13 +102,13 @@ class LocationModule(BaseModule):
 
         context.user_data["selected_building"] = user_input
 
-        return dict(
-            callback=self.ask_audience
-        )
+        return dict(callback=self.ask_audience)
 
 
     @ensure_dialog_branch("audience_selection", stop_after=True)
-    async def selection_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def selection_audience(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
         log.debug(context.user_data)
         user_input = update.message.text
 
@@ -104,7 +116,6 @@ class LocationModule(BaseModule):
             "location/search/",
             dict(building=context.user_data["selected_building"], audience=user_input),
         ).get("data")
-
 
         if not locations:
             await update.message.reply_text(messages.empty_audiences)
@@ -117,12 +128,11 @@ class LocationModule(BaseModule):
             )
             return dict(stop_dialog=False)
 
-
         # ! КОСТЫЛЬ
         # Мало того, что оно работает чисто в режиме quick, так еще и старые костыли, оно работает
         # Фишки быстрого поиска расписания, вышло не очень, но хоть как-то оно работает...
         location = locations[0]
-        location_id = location.get('id')
+        location_id = location.get("id")
 
         if context.bot_data.get("quick_schedule") is not None:
             context.bot_data["quick_schedule"].update(
@@ -141,3 +151,13 @@ class LocationModule(BaseModule):
             )(update, context)
 
             return dict(stop_dialog=True)
+
+    # * |___________________________________________________________|
+
+
+
+
+    # * ____________________________________________________________
+    # * |               Callback handlers                            |
+
+    # * |___________________________________________________________|

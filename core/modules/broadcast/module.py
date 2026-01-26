@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 #* Core ________________________________________________________________________
-from core.models.user import UserDataType
+from core.models.user import User
 from core.modules.base import BaseModule
 from core.modules.base.decorators import ensure_dialog_branch, ensure_user_settings, set_dialog_branch, try_send_message
 from core.modules.broadcast import messages
@@ -18,7 +18,8 @@ from core.settings.commands import CommandNames
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-
+from typing import List
+from anyio import sleep
 
 log = get_logger()
 
@@ -34,7 +35,7 @@ class BroadcastModule(BaseModule):
         self.application.add_handler(CallbackQueryHandler(self.cancel_callback, pattern="^broadcast_cancel"))
 
 
-        # self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_message))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.selection_message), group=7)
 
 
 
@@ -75,17 +76,16 @@ class BroadcastModule(BaseModule):
     @ensure_dialog_branch('broadcast_message_selection', stop_after=True)
     async def selection_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = update.message.text
-        user_data: UserDataType = context.user_data
+        users: List[User] = User.objects.all()
 
-        # await update.message.reply_text(
-        #     text=user_input,
-        #     reply_markup=ReplyKeyboardRemove(),
-        # )
+        for user in users:
+            await context.bot.send_message(
+                chat_id=user.user_id,
+                text=user_input,
+                disable_web_page_preview=True,
+            )
 
-        await context.bot.send_message(
-            chat_id=user_data.get('user_id'),
-            text=user_input,
-        )
+            await sleep(.25)
 
         return True
 

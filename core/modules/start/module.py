@@ -28,7 +28,7 @@ from core.settings.commands import CommandNames
 
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
-from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
 
 if TYPE_CHECKING:
     from core.modules.teacher.module import TeacherModule
