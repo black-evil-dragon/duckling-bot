@@ -1,6 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Dict, List
-
 
 def get_date_by_weekday(start_date, weekday):
     start = datetime.strptime(start_date, "%Y-%m-%d")

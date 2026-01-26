@@ -20,9 +20,7 @@ from core.settings.commands import CommandNames
 from core.session import Session
 from utils.logger import get_logger
 from slugify import slugify
-from typing import TYPE_CHECKING, Any, Dict, List
-
-import requests
+from typing import Any, Dict, List
 
 
 
