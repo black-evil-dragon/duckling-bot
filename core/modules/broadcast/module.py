@@ -79,13 +79,16 @@ class BroadcastModule(BaseModule):
         users: List[User] = User.objects.all()
 
         for user in users:
-            await context.bot.send_message(
-                chat_id=user.user_id,
-                text=user_input,
-                disable_web_page_preview=True,
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text=user_input,
+                    disable_web_page_preview=True,
+                )
 
-            await sleep(.25)
+                await sleep(.25)
+            except Exception as error:
+                log.error(f'Ошибка рассылки сообщения! {error}')
 
         return True
 
