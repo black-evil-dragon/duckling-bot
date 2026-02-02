@@ -28,8 +28,8 @@ class BaseManager(Generic[T]):
         self.model = model
 
         log.debug("+ Инициализирован BaseManager")
-        
-    
+
+
 
 
     def create(self, **fields) -> "T":
@@ -49,7 +49,7 @@ class BaseManager(Generic[T]):
 
         with Database.session_scope() as session:
             return self.model.get_by_id(obj_id, session)
-        
+
     def get(self, **filters) -> Optional[T]:
         """Получить объект по id."""
         session: Optional["Session" | None]
@@ -59,8 +59,8 @@ class BaseManager(Generic[T]):
             for field, value in filters.items():
                 query = query.filter(getattr(self.model, field) == value)
             return query.first()
-        
-        
+
+
     def get_or_create(self, defaults: Optional[Dict[str, Any]] = None, **filters) -> "T":
         """Получить объект по фильтрам или создать новый с defaults."""
         defaults = defaults or {}
@@ -75,7 +75,7 @@ class BaseManager(Generic[T]):
                 else:
                     # Для обычных полей
                     query = query.filter(getattr(self.model, field) == value)
-            
+
             instance = query.first()
 
             if instance:
@@ -87,8 +87,8 @@ class BaseManager(Generic[T]):
             session.flush()
             session.refresh(instance)
             return instance
-        
-        
+
+
     def update_or_create(self, defaults: Optional[Dict[str, Any]] = None, **filters) -> "T":
         """Обновить объект по фильтрам или создать новый с defaults."""
         defaults = defaults or {}
@@ -101,7 +101,7 @@ class BaseManager(Generic[T]):
                     query = query.filter(getattr(self.model, field) == value)
                 else:
                     query = query.filter(getattr(self.model, field) == value)
-            
+
             instance = query.first()
 
             if instance:
@@ -158,37 +158,37 @@ class BaseManager(Generic[T]):
 
         with Database.session_scope() as session:
             query = session.query(self.model)
-            
+
             for key, value in kwargs.items():
                 if key.endswith('__exclude'):
                     # Исключение
                     actual_key = key.replace('__exclude', '', 1)
                     query = query.filter(not_(getattr(self.model, actual_key)))
-                    
+
                 elif key.endswith('__gt'):
                     # Больше чем
                     actual_key = key.replace('__gt', '', 1)
                     query = query.filter(getattr(self.model, actual_key) > value)
-                    
+
                 elif key.endswith('__lt'):
                     # Меньше чем
                     actual_key = key.replace('__lt', '', 1)
                     query = query.filter(getattr(self.model, actual_key) < value)
-                    
+
                 elif key.endswith('__in'):
                     # В списке
                     actual_key = key.replace('__in', '', 1)
                     query = query.filter(getattr(self.model, actual_key).in_(value))
-                    
+
                 elif key.endswith('__not_in'):
                     # Не в списке
                     actual_key = key.replace('__not_in', '', 1)
                     query = query.filter(getattr(self.model, actual_key).notin_(value))
-                    
+
                 else:
                     # Обычное равенство
                     query = query.filter(getattr(self.model, key) == value)
-                    
+
                 return query.all()
 
 
@@ -214,8 +214,8 @@ class ManagerDescriptor:
     def __get__(self, instance, owner) -> BaseManager:
         if instance is not None:
             raise AttributeError("Manager доступен только через класс, не через экземпляр")
-        
+
         if owner not in self._instances:
             self._instances[owner] = self.manager_class(owner)
-        
+
         return self._instances[owner]

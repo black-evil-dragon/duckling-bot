@@ -1,6 +1,6 @@
 *.env
 .env
-
+*.log.*
 group_data.json
 
 

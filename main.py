@@ -25,7 +25,7 @@ import logging
 
 
 
-            
+
 
 class Bot:
 
@@ -40,10 +40,10 @@ class Bot:
         # * Session
         self.session_manager: 'Session' = Session(
             id=api_id,
-            key=api_key,  
+            key=api_key,
         )
         self.app.bot_data.update({'session': self.session_manager})
-        
+
 
         # * Database
         self.setup_database(db_filename)
@@ -52,7 +52,7 @@ class Bot:
     async def post_init(self, application):
         await setup_commands(application, COMMANDS)
 
-            
+
 
     # * ____________________________________________________________
     # * |                       Setups                              |
@@ -66,19 +66,17 @@ class Bot:
             log.info('Подключение к базе данных')
             if not os.path.exists(filename):
                 log.error(f'| Файл {filename} не найден!')
-                
+
                 open(filename, 'w').close()
                 log.info(f'| Создан новый файл базы данных: {filename}')
-            
-        
+
+
             # Init db
             Database.init(url=f'sqlite:///{filename}')
 
             # Create tables
             User.create_all()
             Subscriber.create_all()
-
-
 
             log.info(f'+ База данных успешно подключена к файлу: {filename}')
 
@@ -100,7 +98,7 @@ class Bot:
 def main():
     try:
         from core.settings.config import BOT_TOKEN, DB_FILEPATH, API_KEY, API_ID
-        
+
         # * Инициализация ---------------------------------------------------------
         bot = Bot(
             token=BOT_TOKEN,
@@ -113,26 +111,26 @@ def main():
         # * Подключаем модули и запускаем ----------------------------------------
         try:
             from core.modules import setup_modules
-            
+
 
             bot.setup_modules(setup_modules)
-            
+
             bot.run()
 
         except Exception as error:
             return log.exception(f'Не удалось загрузить модули: {str(error)}')
-        
+
 
     except ImportError:
         log.error('Не найден файл конфигурации [./utils/config.py].')
         log.error('| - Создайте файл конфигурации на основе [./utils/config.template.py]')
         return
-    
-    
+
+
 
 
 if __name__ == "__main__":
-    load_dotenv() 
+    load_dotenv()
 
     log: 'logging.Logger' = None
     log = setup_logger()

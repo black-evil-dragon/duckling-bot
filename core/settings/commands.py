@@ -11,18 +11,31 @@ class CommandNames(TextChoices):
     HELP = "help", "Помощь"
     MENU = "menu", "Меню"
     SETTINGS = "settings", "Настройки"
-    
+
     SET_GROUP = "group", "Установить группу"
     SET_SUBGROUP = "subgroup", "Установить подгруппу"
-    
+
+    SET_TEACHER = "teacher", "Установить преподавателя"
+
+
     SET_REMINDER = "setreminder", "Установить время рассылки"
     SHOW_REMINDER = "myreminder", "Моя рассылка"
-    
+
     SCHEDULE = "schedule", "Расписание"
+
+    DATE = "date", "Расписание на дату"
     WEEK = "week", "Расписание на неделю"
     TODAY = "today", "Расписание на сегодня"
     TOMORROW = "tomorrow", "Расписание на завтра"
-    
+
+    QUICK_SCHEDULE = "quick", "Расписание с выбором группы или преподавателя"
+    QUICK_GROUP_SCHEDULE = "quickgroup", "Расписание c выбором группы"
+    QUICK_TEACHER_SCHEDULE = "quickteacher", "Расписание c выбором преподавателя"
+    QUICK_LOCATION_SCHEDULE = "quicklocation", "Расписание c выбором преподавателя"
+
+    AUTH = "auth", "Авторизоваться"
+    BROADCAST = "broadcast", "Создать оповещение"
+
 
 class Command:
     name = ""
@@ -30,7 +43,7 @@ class Command:
 
     def __init__(self, name, description = None):
         self.name = name
-        
+
         if description is None:
             description = CommandNames.get_label(name)
 
@@ -46,26 +59,39 @@ class Command:
         return f"/{self.name}"
 
     def get_description(self):
-        # print(CommandNames.get_label(self.name))
         return self.description or CommandNames.get_label(self.name)
 
 
-
+# * Здесь хранятся все команды бота
+# отображаются в заданном порядке,
+# есть возможность дать краткое описание
 COMMANDS_LIST = [
     Command(CommandNames.START),
     Command(CommandNames.SCHEDULE, "Расписание (в зависимости от выбора)"),
     Command(CommandNames.MENU),
+
+    Command(CommandNames.QUICK_SCHEDULE),
+
+    Command(CommandNames.DATE),
+    Command(CommandNames.TODAY),
+    Command(CommandNames.TOMORROW),
+    Command(CommandNames.WEEK),
+
+    # Command(CommandNames.QUICK_GROUP_SCHEDULE),
+    # Command(CommandNames.QUICK_TEACHER_SCHEDULE),
+
     Command(CommandNames.SET_GROUP),
     Command(CommandNames.SET_SUBGROUP),
-    Command(CommandNames.WEEK),
-    Command(CommandNames.TODAY),
-    
+    Command(CommandNames.SET_TEACHER),
+
     Command(CommandNames.SET_REMINDER),
     Command(CommandNames.SHOW_REMINDER),
-    
-    Command(CommandNames.TOMORROW),
+
     Command(CommandNames.SETTINGS),
     Command(CommandNames.HELP),
+
+    Command(CommandNames.AUTH),
+    Command(CommandNames.BROADCAST),
 ]
 
 

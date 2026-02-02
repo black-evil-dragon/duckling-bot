@@ -5,28 +5,37 @@ from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram import InlineKeyboardButton
 
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler
-from telegram.ext import ContextTypes, Application
+from telegram.ext import ContextTypes
 from telegram.ext import filters
 
 from telegram.error import BadRequest
 
+
 #* Core ________________________________________________________________________
-from core.models.subscriber import Subscriber
-from core.models.user import User
-from core.modules.base.messages import get_commands_text, start_text
-from core.modules.reminder.module import ReminderModule
-from core.settings.commands import CommandNames
+from core.models import Subscriber, User
 
+from core.models.user.types import UserDataType, UserSettingsType
 from core.modules.base import BaseModule
-from core.modules.base.decorators import ensure_user_settings
-
-from core.modules.group.module import GroupModule
-from core.modules.schedule.module import ScheduleModule
+from core.modules.base.messages import get_commands_text, start_text
+from core.modules.base.decorators import ensure_user_settings, try_send_message
 
 from core.modules.start import messages
 from core.modules.reminder import messages as reminder_messages
+
+
+from core.settings.commands import CommandNames
+
+
 #* Other packages ________________________________________________________________________
 from utils.logger import get_logger
+from typing import TYPE_CHECKING, Any, Callable, Dict, Tuple
+
+if TYPE_CHECKING:
+    from core.modules.teacher.module import TeacherModule
+    from core.modules.reminder.module import ReminderModule
+    from core.modules.group.module import GroupModule
+    from core.modules.schedule.module import ScheduleModule
+
 
 
 log = get_logger()
@@ -35,76 +44,114 @@ log = get_logger()
 
 #* Module ________________________________________________________________________
 class StartModule(BaseModule):
-
-    application: 'Application' = None
-
-
-
-    def setup(self, application: 'Application') -> None:
-        application.add_handler(MessageHandler(
-            filters.ALL, 
+    def setup(self) -> None:
+        self.application.add_handler(MessageHandler(
+            filters.ALL,
             self.update_user_settings
         ), group=-1)
 
-        application.add_handler(MessageHandler(
-            ~filters.COMMAND, 
+        self.application.add_handler(MessageHandler(
+            ~filters.COMMAND,
             self.some_text
-        ), group=-1) 
+        ), group=-1)
 
-        application.add_handler(CommandHandler(CommandNames.START, self.start))
-        application.add_handler(CommandHandler(CommandNames.HELP, self.help))
-        application.add_handler(CommandHandler(CommandNames.MENU, self.get_menu))
-        application.add_handler(CommandHandler(CommandNames.SETTINGS, self.send_settings))
-
-
-        application.add_handler(CallbackQueryHandler(self.handle_settings, pattern="^settings#"))
-        application.add_handler(CallbackQueryHandler(self.handle_inline_commands, pattern="^delegate#"))
+        self.application.add_handler(CommandHandler(CommandNames.START, self.start))
+        self.application.add_handler(CommandHandler(CommandNames.HELP, self.help))
+        self.application.add_handler(CommandHandler(CommandNames.MENU, self.get_menu))
+        self.application.add_handler(CommandHandler(CommandNames.SETTINGS, self.send_settings))
 
 
-        self.application = application
+        self.application.add_handler(CallbackQueryHandler(self.handle_settings, pattern="^settings#"))
+        self.application.add_handler(CallbackQueryHandler(self.handle_inline_commands, pattern="^delegate#"))
 
 
-    @classmethod
-    async def handle_inline_commands(cls, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        MENU_COMMANDS = cls.get_menu_commands(context)
+    @ensure_user_settings()
+    async def handle_inline_commands(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        MENU_COMMANDS = self.get_menu_commands(context)
 
         query = update.callback_query
         await query.answer()
 
         # Получаем номер недели из callback_data
         command = str(query.data.split('#')[-1])
-        
-        # ! КОСТЫЛЬ 
+        params = {}
+
+        if '?' in command:
+            command, params_str = command.split('?')
+
+            for param in params_str.split('&'):
+                name, value = param.split('=')
+                params[name] = value
+
+            context.bot_data['inline_params'] = params
+
         handler_map = {
             command: func for command, _, func in MENU_COMMANDS
         }
-        
-        # !КОСТЫЛЬ
+
+        # !КОСТЫЛЬ, почти
+        reminderModule: ReminderModule = self.manager.get_module('reminder')
+        scheduleModule: ScheduleModule = self.manager.get_module('schedule')
+
         handler_map.update({
-            CommandNames.SET_REMINDER: ReminderModule.ask_reminder_time,
-            CommandNames.SHOW_REMINDER: ReminderModule.show_reminder_info,
+            CommandNames.SET_REMINDER: reminderModule.ask_reminder_time,
+            CommandNames.SHOW_REMINDER: reminderModule.show_reminder_info,
+
+            CommandNames.QUICK_GROUP_SCHEDULE: scheduleModule.get_quick_group_schedule,
+            CommandNames.QUICK_TEACHER_SCHEDULE: scheduleModule.get_quick_teacher_schedule,
+            CommandNames.QUICK_LOCATION_SCHEDULE: scheduleModule.get_quick_location_schedule,
         })
-        
+
 
         if command in handler_map:
             await handler_map[command](update, context)
 
         elif command == 'menu':
-            await cls.get_menu(update, context)
-            
-            
+            await self.get_menu(update, context)
+
+
 
     @classmethod
     async def show_command_keyboard(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE') -> None:
         buttons = context.bot_data['command_keyboard']
         reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
         update_message = update.message or update.callback_query.message
-    
+
         await update_message.reply_text(
             messages.show_command_keyboard,
             reply_markup=reply_markup
-        
+
         )
+
+
+    # * ____________________________________________________________
+    # * |                        Utils                              |
+    def check_target_id(self, context: ContextTypes.DEFAULT_TYPE) -> Tuple[bool, Callable[[Any, Update, ContextTypes.DEFAULT_TYPE], Any], str]:
+        user_settings: Dict[str, Any] = context.user_data.get('user_settings', {})
+        required_field = 'selected_group'
+
+        groupModule: GroupModule = self.manager.get_module('group')
+
+        callback = groupModule.ask_institute
+
+        if user_settings.get('target_type', 'student') == 'teacher':
+            teacherModule: TeacherModule = self.manager.get_module('teacher')
+            required_field = 'selected_teacher'
+            callback = teacherModule.ask_teacher
+
+        if context.bot_data.get('quick_schedule') is not None:
+            if context.bot_data['quick_schedule'].get('target_id'):
+                return True, None, None
+
+            return False, callback, 'target_id'
+
+        if not context.user_data.get(required_field, False):
+            return False, callback, required_field
+
+        return True, None, required_field
+
+    async def target_exists_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, callback: Callable):
+        await callback(update, context)
 
 
 
@@ -124,48 +171,79 @@ class StartModule(BaseModule):
     @classmethod
     async def help(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
-        
+
         await update_message.reply_text(get_commands_text())
         await cls.show_command_keyboard(update, context)
 
 
-    @classmethod
-    def get_menu_commands(cls, context: 'ContextTypes.DEFAULT_TYPE'):
-        user_settings: dict = context.user_data.get('user_settings', {})
 
-        # ! КОСТЫЛЬ - название команд отличается от CommandNames
+    def get_menu_commands(self, context: ContextTypes.DEFAULT_TYPE):
+        user_data: UserDataType = context.user_data
+        user_settings = user_data.get('user_settings')
+
+        scheduleModule: ScheduleModule = self.manager.get_module('schedule')
+        groupModule: GroupModule = self.manager.get_module('group')
+        reminderModule: ReminderModule = self.manager.get_module('reminder')
+        teacherModule: TeacherModule = self.manager.get_module('teacher')
+
         MENU_COMMANDS = (
+            # ROW
             (None, None, None),
-            ("help", "Помощь", cls.help),
+            (CommandNames.HELP, "📄 Помощь", self.help),
             (None, None, None),
 
-            ("schedule", "Расписание", ScheduleModule.schedule_handler),
-            ("today", "На сегодня", ScheduleModule.get_schedule_day) if user_settings.get('show_week', False) else ("week", "На неделю", ScheduleModule.get_schedule_week),
-            ("tomorrow", "На завтра", ScheduleModule.get_schedule_next_day),
+            # ROW
+            (CommandNames.SCHEDULE, "Расписание", scheduleModule.schedule_handler),
+            (CommandNames.TODAY, "На сегодня", scheduleModule.get_schedule_day) if user_settings.get('show_week') else ("week", "На неделю", scheduleModule.get_schedule_week),
+            (CommandNames.TOMORROW, "На завтра", scheduleModule.get_schedule_next_day),
 
-            ("set_group", "Установить группу", GroupModule.ask_institute),
+            # ROW
             (None, None, None),
-            ("set_subgroup", "Установить подгруппу", GroupModule.ask_subgroup),
-            
-            ("settings", "Настройки", cls.send_settings),
+            (CommandNames.DATE, "🗓️ Календарь", scheduleModule.ask_date),
+            (None, None, None),
+
+            # ROW
+            (None, None, None),
+            (CommandNames.QUICK_SCHEDULE, "🔍 Быстрый поиск", scheduleModule.ask_target_type),
+            (None, None, None),
+
+            # ROW
+            (None, None, None),
+            (CommandNames.SHOW_REMINDER, "📢 Рассылка", reminderModule.show_reminder_info),
+            (None, None, None),
+
+            # ROW
+            (CommandNames.SET_GROUP, "Установить группу", groupModule.ask_institute),
+            (None, None, None),
+            (CommandNames.SET_SUBGROUP, "Установить подгруппу", groupModule.ask_subgroup),
+
+            # ROW
+            (CommandNames.SET_TEACHER, "Установить преподавателя", teacherModule.ask_teacher),
+            (None, None, None),
+            (None, None, None),
+
+            # ROW
+            (CommandNames.SETTINGS, "⚙️ Настройки", self.send_settings),
         )
 
         return MENU_COMMANDS
 
 
-    @classmethod
+
     @ensure_user_settings(need_update=True)
-    async def get_menu(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
+    @try_send_message()
+    async def get_menu(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
-        MENU_COMMANDS = cls.get_menu_commands(context)
+        MENU_COMMANDS = self.get_menu_commands(context)
+
 
         reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd] 
+            [InlineKeyboardButton(text=desc, callback_data=f"delegate#{cmd}") for cmd, desc, _ in MENU_COMMANDS[i:i+3] if cmd]
             for i in range(0, len(MENU_COMMANDS), 3)
         ])
-        
-        await update_message.reply_text(
-            "📋 Главное меню:",
+
+        return update_message.edit_text, dict(
+            text="📋 Главное меню:",
             reply_markup=reply_markup
         )
 
@@ -174,61 +252,75 @@ class StartModule(BaseModule):
     @classmethod
     @ensure_user_settings(is_await=False)
     def get_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
-        user_settings: dict = context.user_data.get('user_settings', {})
-        # _, user_scheduled_time_label = context.user_data.get('scheduled_time', {})
+        user_data: UserDataType = context.user_data
+        user_settings: UserSettingsType = user_data.get('user_settings', {})
 
-                    
+        message_templates = {
+            'default': 'Обычный',
+            'compact': 'Компактный',
+            'minimal': 'Минимальный'
+        }
+
         SETTINGS_COMMANDS = (
             None,
             (
-                f"settings#bool${not user_settings.get('subgroup_lock', False)}$subgroup_lock",
-                f"Только подгруппа {'✅' if user_settings.get('subgroup_lock', False) else '❌'}",
+                f"settings#bool${not user_settings.get('subgroup_lock')}$subgroup_lock",
+                f"Только подгруппа {'✅' if user_settings.get('subgroup_lock') else '❌'}",
             ),
             None,
 
 
             # Связанные настройки, если включен один, другой выключить
             (
-                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
-                f"П.у неделя {'✅' if user_settings.get('show_week', False) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week')}$show_week",
+                f"П.у неделя {'✅' if user_settings.get('show_week') else '❌'}",
             ),
             None,
             (
-                f"settings#bool${not user_settings.get('show_week', False)}$show_week",
-                f"П.у день {'✅' if not user_settings.get('show_week', False) else '❌'}",
+                f"settings#bool${not user_settings.get('show_week')}$show_week",
+                f"П.у день {'✅' if not user_settings.get('show_week') else '❌'}",
             ),
 
 
-            None,
+            None,None,
             (
-                f"settings#bool${not user_settings.get('reminder', False)}$reminder",
-                f"📢 Рассылка {'✅' if user_settings.get('reminder', False) else '❌'}",
+                f"settings#bool${not user_settings.get('reminder')}$reminder",
+                f"📢 Рассылка {'✅' if user_settings.get('reminder') else '❌'}",
             ),
-            None,
+
+
+
+
+            None,None,
+            ("ignore", f"💬 Формат: {message_templates[user_settings.get('message_template', 'default')]}"),
+
+            ("settings#str$default$message_template", f"📚 Обычный {'✅' if user_settings.get('message_template', 'default') == 'default' else '❌'}"),
+            ("settings#str$compact$message_template", f"📔 Компакт. {'✅' if user_settings.get('message_template', 'default') == 'compact' else '❌'}"),
+            ("settings#str$minimal$message_template", f"📄 Мин. {'✅' if user_settings.get('message_template', 'default') == 'minimal' else '❌'}"),
 
             None,
-            (f"delegate#{CommandNames.SET_REMINDER}", "⏰ Выбрать время"),
-            (f"delegate#{CommandNames.SHOW_REMINDER}", CommandNames.SHOW_REMINDER.label),
-            
-            None,
+            ("settings#str$student$target_type", f"Группа {'✅' if user_settings.get('target_type', 'student') == 'student' else '❌'}"),
+            ("settings#str$teacher$target_type", f"Преподаватель {'✅' if user_settings.get('target_type', 'student') == 'teacher' else '❌'}"),
+
+            None,None,
             (f"delegate#{CommandNames.MENU}", "📍 Меню"),
-            None,
         )
 
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton(text=command[1], callback_data=f"{command[0]}") for command in SETTINGS_COMMANDS[i:i+3] if command] 
+            [InlineKeyboardButton(text=command[1], callback_data=f"{command[0]}") for command in SETTINGS_COMMANDS[i:i+3] if command]
             for i in range(0, len(SETTINGS_COMMANDS), 3)
         ])
 
 
     @classmethod
     @ensure_user_settings(need_update=True)
+    @try_send_message()
     async def send_settings(cls, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         reply_markup = cls.get_settings(update, context)
-        
+
         # ? Что это такое???
-        # Это прикол, который позволяет отправлять 
+        # Это прикол, который позволяет отправлять
         # свой markup с text через контекст
         context.user_data.update(dict(
             send_custom_settings=False,
@@ -236,12 +328,11 @@ class StartModule(BaseModule):
             get_actual_markup=None
         ))
 
-        await update_message.reply_text(
-            messages.settings_text,
+        return update_message.edit_text, dict(
+            text=messages.settings_text,
             parse_mode='HTML',
             reply_markup=reply_markup
         )
-
     # * |___________________________________________________________|
 
 
@@ -258,82 +349,86 @@ class StartModule(BaseModule):
 
     # * ____________________________________________________________
     # * |               Callback handlers                            |
-    @staticmethod
     @ensure_user_settings(need_update=True)
-    async def handle_settings(update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):      
+    async def handle_settings(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         update_message = update.message or update.callback_query.message
         query = update.callback_query
 
         await query.answer()
-        
+
         user: User = context.user_data.get('user_model')
         user_settings: dict = context.user_data.get('user_settings', {})
-        
+
         # * Определение настройки
         command = query.data.split('#')[-1]
         value_type, value, setting = command.split('$')
 
+        target_type = user_settings.get('target_type', 'student')
 
-        # * Особенности поведения
-        # !КОСТЫЛЬ
-        # В теории, это надо вынести в отдельный метод
-        # Тогда здесь можно было бы написать типо
-        # | if callback_checker is not None:
-        # |     callback_checker(command_info)
 
         # * Дефолтные проверки
         if setting == 'subgroup_lock' and context.user_data.get('selected_subgroup') is None:
-            await GroupModule.ask_subgroup(update, context)
-        
-        if setting == 'reminder':
-            subscriber: "Subscriber" = Subscriber.objects.update_or_create(
-                user_id=user.id,
-                # defaults=dict(
-                #     is_active=user_settings.get('reminder', False)
-                # )
-            )
+            groupModule: GroupModule = self.manager.get_module('group')
+            await groupModule.ask_subgroup(update, context)
 
-            if context.user_data.get('selected_group') is None:
+        if setting == 'target_type':
+            teacherModule: TeacherModule = self.manager.get_module('teacher')
+
+            if value == 'teacher' and context.user_data.get('selected_teacher') is None:
+                await context.bot.send_message(
+                    chat_id=user.user_id,
+                    text=messages.settings_set_error
+                )
+
+                await teacherModule.ask_teacher(update, context)
+                return
+
+        if setting == 'reminder':
+            subscriber: "Subscriber" = Subscriber.objects.update_or_create(user_id=user.id)
+
+
+            if context.user_data.get('selected_group') is None and target_type == 'student':
                 await context.bot.send_message(
                     chat_id=user.user_id,
                     text=reminder_messages.group_is_not_chosen,
                 )
-                # await GroupModule.ask_institute(update, context)
                 return
-            
-    
-            if subscriber.schedule_time is None:
+
+            if subscriber.schedule_time is None and target_type == 'student':
                 await context.bot.send_message(
                     chat_id=user.user_id,
                     text=reminder_messages.time_is_not_chosen,
                 )
-                # await ReminderModule.ask_reminder_time(update, context)
                 return
-                
-                
-            await ReminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
-        
-        
+
+
         # * Обновление данных
         user_settings = user.set_setting(setting, value, value_type)
         context.user_data.update(dict(user_settings=user_settings))
-        
-        
+
+
+        # * Пост проверки
+        if setting == 'reminder':
+            reminderModule: ReminderModule = self.manager.get_module('reminder')
+
+            await reminderModule.sign_subscriber(subscriber, user_settings.get('reminder', False), user=user)
+
+
         # !КОСТЫЛЬ.. Наверное
         # См метод send_settings
         # * Надстройка для отправки своего markup и text
-        reply_markup = StartModule.get_settings(update, context)
+        reply_markup = self.get_settings(update, context)
         text = messages.settings_text
-        
+
         if context.user_data.get('send_custom_settings', False):
             get_custom_markup = context.user_data.get('get_custom_markup')
-            
+
             if get_custom_markup:
                 reply_markup = get_custom_markup(user_settings)
-            
+
             text = context.user_data.get('custom_settings_text', messages.settings_text)
-        
-    
+
+
         # * Отправка сообщения
         try:
             await update_message.edit_text(
@@ -344,7 +439,6 @@ class StartModule(BaseModule):
 
         except BadRequest:
             log.error('Ошибка при редактировании сообщения, возможно, сообщение не изменено.')
-            # log.debug('Текст ошибки:', exc_info=True)
             return
 
     # * |___________________________________________________________|

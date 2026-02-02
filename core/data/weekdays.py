@@ -14,5 +14,5 @@ class WeekDay:
     FRIDAY = 4
     SATURDAY = 5
     SUNDAY = 6
-    
+
 # TODO: Сделать класс WeekDayChoices на основе новой orm (./db/core/models/enums.py)

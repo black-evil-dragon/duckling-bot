@@ -13,16 +13,16 @@ class Subscriber(models.BaseModel):
         table_name = 'subscribers'
 
     is_active = Column(Boolean, default=False)
-        
+
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship('User', backref=f'{Meta.table_name}')
-    
+
     schedule_time = Column(Time, default=None, index=True)
-    
-    
+
+
     def __str__(self):
         return f"Подписчик: {self.user_id}"
-    
+
 
     def get_user(self, session: "Session" = None):
         if session is None:
@@ -30,27 +30,32 @@ class Subscriber(models.BaseModel):
                 return session.merge(self).user
 
         return session.merge(self).user
-    
-    
+
+
     def set_scheduled_time(self, time: 'datetime.datetime'):
         self.scheduled_time = time
         self.save()
-        
-        
+
+
+    def set_active(self, value = True):
+        self.is_active = value
+        self.save()
+
+
     def get_schedule_time(self, to_str: bool = False) -> Optional[Union[str, datetime.time]]:
         self.schedule_time: Optional[datetime.datetime | None]
 
         if self.schedule_time is None:
             return None
-        
+
         if to_str:
             return self.schedule_time.strftime('%H:%M')
 
         return self.schedule_time
-    
-    
+
+
     @classmethod
-    def get_active_subscribers(cls) -> List['Subscriber']:        
+    def get_active_subscribers(cls) -> List['Subscriber']:
         with Database.session_scope() as session:
             joined_table = session.query(cls).options(joinedload(cls.user))
             return [

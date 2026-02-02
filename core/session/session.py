@@ -22,11 +22,11 @@ class Session:
         try:
             log.info("Инициализация новой сессии")
             self.session = requests.Session()
-            
-            self.session.headers = { 
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10 10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.8.2171.95 Safari/537.36", 
-                "Accept": "application/json", 
-                "X-Requested-With": "XMLHttpRequest", 
+
+            self.session.headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10 10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.8.2171.95 Safari/537.36",
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
             }
 
             self.auth_data = dict(
@@ -44,30 +44,30 @@ class Session:
 
             else:
                 self.check_session(is_first=True)
-            
+
             log.info("+ Сессия успешно инициализирована")
 
 
             self.get_all_groups()
 
-            
+
         except Exception as error:
             log.critical(f"! Критическая ошибка при инициализации сессии: {str(error)}")
             raise RuntimeError(f"Не удалось инициализировать сессию: {str(error)}")
-        
-    # * |___________________________________________________________      
+
+    # * |___________________________________________________________
 
 
 
 
     # * ____________________________________________________________
-    # * |                       Update data                          
+    # * |                       Update data
     def get_all_groups(self):
-        path = 'group/get-tree/'
+        path = 'group/tree/'
 
         response: 'requests.Response' = self.post(path)
-        
-        
+
+
         response_data: dict = response.json()
 
         group_ids = {}
@@ -91,16 +91,43 @@ class Session:
 
 
     # * ____________________________________________________________
-    # * |                 Http methods                      
+    # * |                 Http methods
+    def fetch(
+        self,
+        path: str,
+        params: dict = None,
+    ) -> dict:
+        if params is None:
+            params = {}
+
+        response: requests.Response = self.post(
+            path,
+            json=params
+        )
+
+        try:
+            response.raise_for_status()
+        except Exception as error:
+            log.error(f'Ошибка при запросе: {error}. Данные ответа: {response.content.decode("unicode_escape")}. Данные запроса: {params}')
+            return
+
+        response_json: dict = response.json()
+
+        # log.debug(f'Получен ответ: {str(response_json)[:100]}...')
+
+        return response_json
+
+
+
     @try_repeat_catch(
         max_attempts=2,
         delay_seconds=2.0,
-    )             
+    )
     def post(self, path, data=None, json=None, **kwargs) -> 'requests.Response':
         url = f'{self.URL}/{path}'
         response = self.session.post(url, data=data, json=json, **kwargs)
         # log.debug(f'POST {path} - {response.status_code}')
-        
+
         if response.status_code in [400, 403]:
             log.warning(f"| Получен статус {response.status_code}, повторяем авторизацию")
 
@@ -115,7 +142,7 @@ class Session:
                 log.error(response.json().get('error', ""))
 
             response.raise_for_status()
-            
+
         return response
     # * |___________________________________________________________
 
@@ -123,7 +150,7 @@ class Session:
 
 
     # * ____________________________________________________________
-    # * |               Tokens utils                                
+    # * |               Tokens utils
     def set_tokens(self, response: 'requests.Response'):
         try:
             data: dict = response.json()
@@ -143,7 +170,7 @@ class Session:
 
         except Exception as error:
             raise Exception(f"Не удалось установить токены авторизации. {error}")
-        
+
     def set_csrf(self, response: 'requests.Response'):
         self.session.headers.update({
             "X-CSRFToken": response.cookies.get('csrftoken'),
@@ -154,7 +181,7 @@ class Session:
 
 
     # * ____________________________________________________________
-    # * |                       Session utils                
+    # * |                       Session utils
     def touch(self):
         path = f'{self.URL}/auth/'
 
@@ -170,7 +197,7 @@ class Session:
         else:
             log.error("| Не удалось получить csrf токен")
             raise RuntimeError('Неудачная попытка авторизации. ID подключения отсутствует!')
-        
+
 
 
     def create_session(self):
@@ -188,7 +215,7 @@ class Session:
         if response.json().get('success', False):
             self.set_tokens(response)
         else:
-            raise Exception("Не удалось авторизоваться на сервере")      
+            raise Exception("Не удалось авторизоваться на сервере")
 
 
 
@@ -198,7 +225,7 @@ class Session:
         log.info('| Проверяем актуальность токенов авторизации')
 
         if is_first: return self.update_tokens()
-            
+
 
         response = self.session.get(path)
 
@@ -207,9 +234,9 @@ class Session:
 
         else:
             self.update_tokens()
-            
 
- 
+
+
     def update_tokens(self):
         path = f'{self.URL}/auth-update/'
 
@@ -220,6 +247,8 @@ class Session:
         })
 
         response = self.session.get(path)
+
+        log.debug(response.json())
 
         if response.json().get('success', False):
             self.set_tokens(response)
