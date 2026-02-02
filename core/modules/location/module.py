@@ -1,4 +1,5 @@
 # * Telegram bot framework ________________________________________________________________________
+from typing import Any, Dict, List
 from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
@@ -32,6 +33,7 @@ class LocationModule(BaseModule):
     session: Session = None
 
     teachers = {}
+    last_selected_audience: str | None = None
 
     def setup(self):
         self.session = self.application.bot_data.get("session")
@@ -69,7 +71,6 @@ class LocationModule(BaseModule):
 
     @set_dialog_branch("audience_selection", reset_attempt=True)
     async def ask_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        log.debug(context.user_data)
         update_message = update.message or update.callback_query.message
 
         await update_message.reply_text(
@@ -84,10 +85,7 @@ class LocationModule(BaseModule):
     # * ____________________________________________________________
     # * |               Message handlers                            |
     @ensure_dialog_branch("building_selection", stop_after=True)
-    async def selection_building(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        log.debug(context.user_data)
+    async def selection_building(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = update.message.text
 
         locations = self.session.fetch(
@@ -106,27 +104,31 @@ class LocationModule(BaseModule):
 
 
     @ensure_dialog_branch("audience_selection", stop_after=True)
-    async def selection_audience(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        log.debug(context.user_data)
+    async def selection_audience(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = update.message.text
 
-        locations = self.session.fetch(
+        locations: List[Dict[str, Any]] = self.session.fetch(
             "location/search/",
             dict(building=context.user_data["selected_building"], audience=user_input),
         ).get("data")
+        audiences = [location.get('audience') for location in locations]
 
         if not locations:
             await update.message.reply_text(messages.empty_audiences)
             return
 
-        elif len(locations) > 1:
+        elif len(locations) > 1 and self.last_selected_audience is None:
+            self.last_selected_audience = user_input
             await update.message.reply_text(
                 messages.choose_audience,
                 reply_markup=messages.get_locations_reply_markup(locations),
             )
             return dict(stop_dialog=False)
+
+
+        elif len(locations) > 1 and user_input in audiences:
+            self.last_selected_audience = None
+            locations = list(filter(lambda location: location.get('audience') == user_input, locations))
 
         # ! КОСТЫЛЬ
         # Мало того, что оно работает чисто в режиме quick, так еще и старые костыли, оно работает

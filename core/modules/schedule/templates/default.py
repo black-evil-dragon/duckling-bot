@@ -1,6 +1,6 @@
 from core.modules.schedule.templates.base import BaseTemplate
 
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 
 # * Default template
@@ -80,12 +80,13 @@ class DefaultTemplate(BaseTemplate):
         # Prepare data
         message = ""
 
-        group_name: str = data.get('group', '')
+        target: Literal['student', 'teacher', 'location'] = data.get('target', 'student')
+        target_name: str = data.get(target, '')
 
         # Create message
         message += (
             f"{self.header_component(
-                group_name,
+                target_name,
                 data.get('date_start'),
                 data.get('date_end')
             )}"
