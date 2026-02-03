@@ -1,6 +1,6 @@
 from core.modules.schedule.templates.base import BaseTemplate
 
-from typing import Any, Dict, Literal
+from typing import Any, Dict, List, Literal
 
 
 # * Default template
@@ -46,7 +46,8 @@ class DefaultTemplate(BaseTemplate):
 
         date = data.get('date', '')
         week_day = data.get('week_day', '')
-        lessons = data.get('lessons', [])
+        lessons: List[Dict] = data.get('lessons', [])
+        lessons.sort(key=lambda x: x.get('order'), reverse=False)
 
 
         # Prepare
@@ -104,6 +105,7 @@ class DefaultTemplate(BaseTemplate):
         for day_key, day_value in sorted(days.items()):
             current_day_name = self.weekday_component(day_key, day_value.get('week_day'), bold=False)
             lessons = day_value['lessons']
+            lessons.sort(key=lambda x: x.get('order'), reverse=False)
 
             if not lessons:
                 days_without_lessons.append(current_day_name)
