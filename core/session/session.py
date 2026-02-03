@@ -248,7 +248,7 @@ class Session:
 
         response = self.session.get(path)
 
-        log.debug(response.json())
+        # log.debug(response.json())
 
         if response.json().get('success', False):
             self.set_tokens(response)
