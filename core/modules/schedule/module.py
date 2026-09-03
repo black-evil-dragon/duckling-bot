@@ -258,7 +258,7 @@ class ScheduleModule(BaseModule):
             entity = 'День'
             additional_buttons = [
                 messages.get_refresh_button(f'{callback_data}#{date.strftime(strf_time_mask)}'),
-                messages.get_schedule_button(f'{callback_data}#{date.today().strftime(strf_time_mask)}')
+                messages.get_schedule_button(f'{callback_data}#today')
             ]
 
         else: # then for period
@@ -268,7 +268,7 @@ class ScheduleModule(BaseModule):
                 messages.get_refresh_button(
                     f'{callback_data}#{date.isocalendar().week}.{date.isocalendar().year}'
                 ),
-                messages.get_schedule_button(f'{callback_data}#{date.today().isocalendar().week}.{date.today().year}')
+                messages.get_schedule_button(f'{callback_data}#today')
             ]
 
 
@@ -536,7 +536,11 @@ class ScheduleModule(BaseModule):
 
         await query.answer()
 
-        week_number, year = query_week_number.split('.')
+
+        if query_week_number == 'today':
+            week_number, year = datetime.today().isocalendar().week, datetime.today().year
+        else:
+            week_number, year = query_week_number.split('.')
 
         date_start = DateType.fromisocalendar(int(year), int(week_number), 1)
         date_end = date_start + timedelta(days=5)
@@ -552,7 +556,7 @@ class ScheduleModule(BaseModule):
     async def schedule_day_callback(self, update: 'Update', context: 'ContextTypes.DEFAULT_TYPE'):
         query = update.callback_query
         query_data = query.data.split('#')
-        query_date = datetime.strptime(query_data[-1], strf_time_mask)
+        query_date = datetime.strptime(query_data[-1], strf_time_mask) if query_data[-1] != 'today' else datetime.today()
         user: User = context.user_data.get('instance')
 
         target_id = None
